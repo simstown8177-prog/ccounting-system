@@ -24,10 +24,10 @@ const elements = {
   sidebarBrandButton: document.querySelector("#sidebarBrandButton"),
   sidebarMenuButton: document.querySelector("#sidebarMenuButton"),
   sidebarMenu: document.querySelector("#sidebarMenu"),
+  sidebarExportButton: document.querySelector("#sidebarExportButton"),
+  sidebarAlertsButton: document.querySelector("#sidebarAlertsButton"),
   sidebarLogoutButton: document.querySelector("#sidebarLogoutButton"),
   openUsersTabButton: document.querySelector("#openUsersTabButton"),
-  exportInventoryButton: document.querySelector("#exportInventoryButton"),
-  enableAlertsButton: document.querySelector("#enableAlertsButton"),
   inventorySearchInput: document.querySelector("#inventorySearchInput"),
   inventoryStatusFilter: document.querySelector("#inventoryStatusFilter"),
   tabs: document.querySelector("#workspaceTabs"),
@@ -81,10 +81,10 @@ initialize();
 function bindEvents() {
   elements.sidebarBrandButton.addEventListener("click", toggleSidebarMenu);
   elements.sidebarMenuButton.addEventListener("click", toggleSidebarMenu);
+  elements.sidebarExportButton.addEventListener("click", handleSidebarExport);
+  elements.sidebarAlertsButton.addEventListener("click", handleSidebarAlerts);
   elements.sidebarLogoutButton.addEventListener("click", handleLogout);
   elements.openUsersTabButton.addEventListener("click", openUsersTab);
-  elements.exportInventoryButton.addEventListener("click", exportInventoryCsv);
-  elements.enableAlertsButton.addEventListener("click", enableAlerts);
   elements.inventorySearchInput.addEventListener("input", handleInventorySearch);
   elements.inventoryStatusFilter.addEventListener("change", handleInventoryFilterChange);
   elements.tabs.addEventListener("click", handleTabClick);
@@ -176,7 +176,7 @@ function render() {
   renderWorkspaceFrame();
   syncTabState();
   renderWorkspace();
-  updateAlertButton();
+  updateSidebarAlertsButton();
 }
 
 function renderWorkspaceFrame() {
@@ -585,6 +585,16 @@ async function exportInventoryCsv() {
   }
 }
 
+function handleSidebarExport() {
+  closeSidebarMenu();
+  exportInventoryCsv();
+}
+
+function handleSidebarAlerts() {
+  closeSidebarMenu();
+  enableAlerts();
+}
+
 async function handleItemSubmit(event) {
   event.preventDefault();
   const formData = new FormData(event.currentTarget);
@@ -881,17 +891,17 @@ async function enableAlerts() {
   updateAlertButton();
 }
 
-function updateAlertButton() {
+function updateSidebarAlertsButton() {
   const categoryId = state.workspaceCategory?.id;
   const pushSubscribed = categoryId ? state.pushSubscribedByCategory[categoryId] : false;
   if (pushSubscribed) {
-    elements.enableAlertsButton.textContent = "브라우저 푸시 활성화됨";
+    elements.sidebarAlertsButton.textContent = "브라우저 푸시 활성화됨";
   } else if (state.notificationEnabled) {
-    elements.enableAlertsButton.textContent = "브라우저 알림 허용됨";
+    elements.sidebarAlertsButton.textContent = "브라우저 알림 허용됨";
   } else {
-    elements.enableAlertsButton.textContent = "브라우저 알림";
+    elements.sidebarAlertsButton.textContent = "브라우저 알림";
   }
-  elements.enableAlertsButton.disabled = Boolean(pushSubscribed);
+  elements.sidebarAlertsButton.disabled = Boolean(pushSubscribed);
 }
 
 function addReceiptLineRow() {

@@ -14,14 +14,6 @@
   </head>
   <body>
     <div class="page-shell workspace-shell">
-      <header class="topbar workspace-topbar">
-        <div class="page-actions">
-          <a class="secondary-button button-link" href="/">메인</a>
-          <button id="exportInventoryButton" class="secondary-button" type="button">재고 CSV</button>
-          <button id="enableAlertsButton" class="secondary-button" type="button">브라우저 알림</button>
-        </div>
-      </header>
-
       <main class="page-stack">
         <section class="workspace-layout">
           <aside class="workspace-sidebar surface-card">
@@ -36,6 +28,9 @@
               <div class="sidebar-menu-wrap">
                 <button id="sidebarMenuButton" class="secondary-button compact-button" type="button">≡</button>
                 <div id="sidebarMenu" class="sidebar-menu hidden">
+                  <a href="/">메인</a>
+                  <button id="sidebarExportButton" type="button">재고 CSV</button>
+                  <button id="sidebarAlertsButton" type="button">브라우저 알림</button>
                   <button id="sidebarLogoutButton" type="button">로그아웃</button>
                   <a href="/">매장변경</a>
                   <button id="openUsersTabButton" type="button">정보변경</button>
