@@ -22,6 +22,7 @@ const elements = {
   currentCategoryBadge: document.querySelector("#currentCategoryBadge"),
   currentUserBadge: document.querySelector("#currentUserBadge"),
   logoutButton: document.querySelector("#logoutButton"),
+  exportInventoryButton: document.querySelector("#exportInventoryButton"),
   enableAlertsButton: document.querySelector("#enableAlertsButton"),
   tabs: document.querySelector("#workspaceTabs"),
   workspaceAlert: document.querySelector("#workspaceAlert"),
@@ -37,14 +38,17 @@ const elements = {
   receiptForm: document.querySelector("#receiptForm"),
   closingForm: document.querySelector("#closingForm"),
   receiptUploadForm: document.querySelector("#receiptUploadForm"),
+  menuRecipeForm: document.querySelector("#menuRecipeForm"),
   ocrPreviewInput: document.querySelector("#ocrPreviewInput"),
   runOcrPreviewButton: document.querySelector("#runOcrPreviewButton"),
+  confirmOcrDeductionButton: document.querySelector("#confirmOcrDeductionButton"),
   ocrPreviewResult: document.querySelector("#ocrPreviewResult"),
   reportDateInput: document.querySelector("#reportDateInput"),
   dailyReportCard: document.querySelector("#dailyReportCard"),
   itemList: document.querySelector("#itemList"),
   vendorList: document.querySelector("#vendorList"),
   userList: document.querySelector("#userList"),
+  menuRecipeList: document.querySelector("#menuRecipeList"),
   userAdminNotice: document.querySelector("#userAdminNotice"),
   purchaseList: document.querySelector("#purchaseList"),
   closingList: document.querySelector("#closingList"),
@@ -54,7 +58,9 @@ const elements = {
   receiptOrderSelect: document.querySelector('#receiptForm select[name="purchaseOrderId"]'),
   closingItemSelect: document.querySelector('#closingForm select[name="itemId"]'),
   receiptLineItems: document.querySelector("#receiptLineItems"),
+  recipeIngredients: document.querySelector("#recipeIngredients"),
   addReceiptLineButton: document.querySelector("#addReceiptLineButton"),
+  addRecipeIngredientButton: document.querySelector("#addRecipeIngredientButton"),
   kakaoForm: document.querySelector("#kakaoForm"),
   kakaoMessageOutput: document.querySelector("#kakaoMessageOutput"),
   copyKakaoMessageButton: document.querySelector("#copyKakaoMessageButton"),
@@ -68,6 +74,7 @@ initialize();
 
 function bindEvents() {
   elements.logoutButton.addEventListener("click", handleLogout);
+  elements.exportInventoryButton.addEventListener("click", exportInventoryCsv);
   elements.enableAlertsButton.addEventListener("click", enableAlerts);
   elements.tabs.addEventListener("click", handleTabClick);
   elements.itemForm.addEventListener("submit", handleItemSubmit);
@@ -77,8 +84,11 @@ function bindEvents() {
   elements.receiptForm.addEventListener("submit", handleReceiptSubmit);
   elements.closingForm.addEventListener("submit", handleClosingSubmit);
   elements.receiptUploadForm.addEventListener("submit", handleReceiptUploadSubmit);
+  elements.menuRecipeForm.addEventListener("submit", handleMenuRecipeSubmit);
   elements.runOcrPreviewButton.addEventListener("click", handleOcrPreview);
+  elements.confirmOcrDeductionButton.addEventListener("click", handleOcrDeductionConfirm);
   elements.addReceiptLineButton.addEventListener("click", addReceiptLineRow);
+  elements.addRecipeIngredientButton.addEventListener("click", addRecipeIngredientRow);
   elements.reportDateInput.addEventListener("change", renderWorkspace);
   elements.kakaoForm.addEventListener("submit", handleKakaoSubmit);
   elements.copyKakaoMessageButton.addEventListener("click", copyKakaoMessage);
@@ -136,10 +146,11 @@ async function apiFetch(url, options = {}) {
   }
 
   const response = await fetch(url, { ...options, headers });
-  const payload = await response.json();
+  const contentType = response.headers.get("content-type") || "";
+  const payload = contentType.includes("application/json") ? await response.json() : await response.text();
 
   if (!response.ok) {
-    const error = new Error(payload.message || payload.error || "request_failed");
+    const error = new Error(payload.message || payload.error || payload || "request_failed");
     error.status = response.status;
     throw error;
   }
@@ -186,6 +197,7 @@ function renderWorkspace() {
   renderReceiptUploadList(category);
   renderDailyReport(category);
   renderKakaoSection(category);
+  renderMenuRecipeSection(category, user);
   renderOcrPreview(category);
   syncReceiptLineRows(category);
 }
@@ -301,8 +313,9 @@ function renderUserSection(category, user) {
 }
 
 function renderOrderForms(category) {
-  elements.purchaseItemSelect.innerHTML = buildItemOptions(category.items);
-  elements.closingItemSelect.innerHTML = buildItemOptions(category.items);
+  const itemOptions = buildItemOptions(category.items);
+  elements.purchaseItemSelect.innerHTML = itemOptions;
+  elements.closingItemSelect.innerHTML = itemOptions;
   elements.purchaseVendorSelect.innerHTML = category.vendors.length
     ? category.vendors.map((vendor) => `<option value="${vendor.id}">${vendor.name}</option>`).join("")
     : '<option value="">거래처를 먼저 등록하세요</option>';
@@ -371,7 +384,29 @@ function renderReceiptUploadList(category) {
     category.receiptUploads.map((upload) => `
       <li class="activity-item">
         <p class="activity-title">${upload.fileName}</p>
-        <p class="activity-meta">${upload.lines.length}개 품목 차감 · ${upload.note || "메모 없음"} · ${formatDateTime(upload.createdAt)}</p>
+        <p class="activity-meta">${upload.lines.length}개 항목 · ${upload.note || "메모 없음"} · ${formatDateTime(upload.createdAt)}</p>
+      </li>
+    `),
+  );
+}
+
+function renderMenuRecipeSection(category, user) {
+  const isManager = user.role === "manager";
+  [...elements.menuRecipeForm.elements].forEach((field) => {
+    field.disabled = !isManager;
+  });
+
+  if (!elements.recipeIngredients.children.length && category.items.length) {
+    addRecipeIngredientRow();
+  }
+
+  renderList(
+    elements.menuRecipeList,
+    (category.menuRecipes || []).map((recipe) => `
+      <li class="activity-item">
+        <p class="activity-title">${recipe.name}</p>
+        <p class="activity-meta">${(recipe.aliases || []).join(", ") || "별칭 없음"}</p>
+        <p class="activity-meta">${recipe.ingredients.map((ingredient) => `${ingredient.itemName} ${formatQuantity(ingredient.quantity)} ${ingredient.unit}`).join(" / ")}</p>
       </li>
     `),
   );
@@ -411,15 +446,31 @@ function renderKakaoSection(category) {
 }
 
 function renderOcrPreview(category) {
-  const preview = category.lastOcrPreview;
+  const preview = category.lastReceiptPreview;
   if (!preview) {
-    elements.ocrPreviewResult.innerHTML = "영수증 텍스트를 넣고 OCR 미리보기를 실행하면 여기에 결과가 표시됩니다.";
+    elements.ocrPreviewResult.innerHTML = "영수증 텍스트를 넣고 자동 차감 검토를 실행하면 메뉴별 차감 예정 재료가 표시됩니다.";
+    elements.confirmOcrDeductionButton.disabled = true;
     return;
   }
 
-  elements.ocrPreviewResult.innerHTML = preview.matchedItems.length
-    ? preview.matchedItems.map((item) => `${item.name} · 추천 수량 ${formatQuantity(item.suggestedQuantity)}`).join("<br />")
-    : "일치하는 등록 품목을 찾지 못했습니다.";
+  elements.confirmOcrDeductionButton.disabled = !preview.matchedMenus.length;
+  if (!preview.matchedMenus.length) {
+    elements.ocrPreviewResult.innerHTML = preview.unmatchedLines.length
+      ? `매칭 실패: ${preview.unmatchedLines.join(" / ")}`
+      : "차감 가능한 메뉴를 찾지 못했습니다.";
+    return;
+  }
+
+  elements.ocrPreviewResult.innerHTML = preview.matchedMenus
+    .map((menu) => `
+      <div class="preview-block">
+        <strong>${menu.menuName}</strong>
+        <div class="summary-line">영수증 라인: ${menu.sourceLine}</div>
+        <div class="summary-line">수량 ${formatQuantity(menu.quantity)} · 신뢰도 ${menu.confidence}</div>
+        <div class="summary-line">${menu.ingredients.map((ingredient) => `${ingredient.itemName} ${formatQuantity(ingredient.totalQuantity)} ${ingredient.unit}`).join(" / ")}</div>
+      </div>
+    `)
+    .join("");
 }
 
 function renderList(target, items) {
@@ -462,6 +513,26 @@ function clearAuth() {
 function redirectToLogin() {
   const categoryId = state.selectedCategoryId ? `?categoryId=${encodeURIComponent(state.selectedCategoryId)}` : "";
   window.location.href = `/login.html${categoryId}`;
+}
+
+async function exportInventoryCsv() {
+  try {
+    const response = await fetch("/api/export/inventory.csv", {
+      headers: { Authorization: `Bearer ${state.authToken}` },
+    });
+    if (!response.ok) {
+      throw new Error("export_failed");
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${state.workspaceCategory.id}-inventory.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  } catch {
+    window.alert("재고 CSV 다운로드 중 오류가 발생했습니다.");
+  }
 }
 
 async function handleItemSubmit(event) {
@@ -587,6 +658,25 @@ async function handleReceiptUploadSubmit(event) {
   addReceiptLineRow();
 }
 
+async function handleMenuRecipeSubmit(event) {
+  event.preventDefault();
+  const formData = new FormData(event.currentTarget);
+  const ingredients = readRecipeIngredients();
+  if (!ingredients.length) {
+    window.alert("재료를 한 줄 이상 입력하세요.");
+    return;
+  }
+
+  await mutateWorkspace("/api/menu-recipes", {
+    name: String(formData.get("name")).trim(),
+    aliases: String(formData.get("aliases")).trim(),
+    ingredients,
+  });
+  event.currentTarget.reset();
+  elements.recipeIngredients.innerHTML = "";
+  addRecipeIngredientRow();
+}
+
 async function handleKakaoSubmit(event) {
   event.preventDefault();
   const formData = new FormData(event.currentTarget);
@@ -612,14 +702,30 @@ async function handleKakaoSimulation() {
 
 async function handleOcrPreview() {
   try {
-    const response = await apiFetch("/api/integrations/ocr/preview", {
-      method: "POST",
-      body: JSON.stringify({ receiptText: elements.ocrPreviewInput.value }),
+    const response = await mutateWorkspace("/api/receipt-deductions/preview", {
+      receiptText: elements.ocrPreviewInput.value,
     });
-    state.workspaceCategory.lastOcrPreview = response.ocrPreview;
+    state.workspaceCategory.lastReceiptPreview = response.receiptPreview;
     renderOcrPreview(state.workspaceCategory);
   } catch (error) {
-    handleWorkspaceError(error, "OCR 미리보기 실행 중 오류가 발생했습니다.");
+    handleWorkspaceError(error, "자동 차감 검토 중 오류가 발생했습니다.");
+  }
+}
+
+async function handleOcrDeductionConfirm() {
+  if (!state.workspaceCategory?.lastReceiptPreview?.matchedMenus?.length) {
+    window.alert("먼저 자동 차감 검토를 실행하세요.");
+    return;
+  }
+
+  try {
+    await mutateWorkspace("/api/receipt-deductions/confirm", {
+      receiptText: elements.ocrPreviewInput.value,
+      fileName: "ocr-auto-deduction",
+    });
+    elements.ocrPreviewInput.value = "";
+  } catch (error) {
+    handleWorkspaceError(error, "자동 차감 확정 중 오류가 발생했습니다.");
   }
 }
 
@@ -722,12 +828,25 @@ function addReceiptLineRow() {
   elements.receiptLineItems.appendChild(wrapper);
 }
 
+function addRecipeIngredientRow() {
+  const items = state.workspaceCategory?.items || [];
+  const wrapper = document.createElement("div");
+  wrapper.className = "line-item";
+  wrapper.innerHTML = `
+    <select name="recipeItemId" required>${buildItemOptions(items)}</select>
+    <input name="recipeQuantity" type="number" min="0.1" step="0.1" placeholder="레시피 수량" required />
+    <button type="button" class="secondary-button">삭제</button>
+  `;
+  wrapper.querySelector("button").addEventListener("click", () => wrapper.remove());
+  elements.recipeIngredients.appendChild(wrapper);
+}
+
 function syncReceiptLineRows(category) {
-  if (state.activeTab !== "receipt") {
-    return;
-  }
-  if (!elements.receiptLineItems.children.length && category.items.length) {
+  if (state.activeTab === "receipt" && !elements.receiptLineItems.children.length && category.items.length) {
     addReceiptLineRow();
+  }
+  if (state.activeTab === "recipes" && !elements.recipeIngredients.children.length && category.items.length) {
+    addRecipeIngredientRow();
   }
 }
 
@@ -737,6 +856,21 @@ function readReceiptRows() {
       itemId: row.querySelector('[name="receiptItemId"]').value,
       quantity: Number(row.querySelector('[name="receiptQuantity"]').value),
     }))
+    .filter((row) => row.itemId && row.quantity > 0);
+}
+
+function readRecipeIngredients() {
+  return [...elements.recipeIngredients.querySelectorAll(".line-item")]
+    .map((row) => {
+      const itemId = row.querySelector('[name="recipeItemId"]').value;
+      const item = findById(state.workspaceCategory.items, itemId);
+      return {
+        itemId,
+        itemName: item?.name || "",
+        unit: item?.unit || "",
+        quantity: Number(row.querySelector('[name="recipeQuantity"]').value),
+      };
+    })
     .filter((row) => row.itemId && row.quantity > 0);
 }
 
@@ -859,7 +993,7 @@ function findById(collection, id) {
 }
 
 function formatQuantity(value) {
-  return Number(value).toLocaleString("ko-KR", { maximumFractionDigits: 1 });
+  return Number(value).toLocaleString("ko-KR", { maximumFractionDigits: 2 });
 }
 
 function formatDateTime(value) {
@@ -873,7 +1007,7 @@ function formatDateTime(value) {
 }
 
 function roundNumber(value) {
-  return Math.round(Number(value) * 10) / 10;
+  return Math.round(Number(value) * 100) / 100;
 }
 
 function urlBase64ToUint8Array(base64String) {

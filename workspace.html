@@ -24,6 +24,7 @@
         </a>
         <div class="page-actions">
           <a class="secondary-button button-link" href="/">메인</a>
+          <button id="exportInventoryButton" class="secondary-button" type="button">재고 CSV</button>
           <button id="enableAlertsButton" class="secondary-button" type="button">브라우저 알림</button>
           <button id="logoutButton" class="primary-button" type="button">로그아웃</button>
         </div>
@@ -50,6 +51,7 @@
               <button class="tab-button" data-tab="items" type="button">재고</button>
               <button class="tab-button" data-tab="vendors" type="button">거래처</button>
               <button class="tab-button" data-tab="orders" type="button">발주/입고</button>
+              <button class="tab-button" data-tab="recipes" type="button">메뉴/레시피</button>
               <button class="tab-button" data-tab="receipt" type="button">영수증 차감</button>
               <button class="tab-button" data-tab="closing" type="button">마감 리포트</button>
               <button class="tab-button" data-tab="users" type="button">사용자</button>
@@ -237,6 +239,44 @@
               </div>
             </section>
 
+            <section class="tab-panel" data-panel="recipes">
+              <div class="sub-grid">
+                <section class="sub-panel">
+                  <div class="section-heading">
+                    <div>
+                      <p class="section-label">메뉴</p>
+                      <h3>메뉴 레시피 등록</h3>
+                    </div>
+                  </div>
+                  <form id="menuRecipeForm" class="stack-form">
+                    <label>
+                      판매 메뉴명
+                      <input name="name" type="text" placeholder="예: 충성콤비네이션M" required />
+                    </label>
+                    <label>
+                      OCR 별칭
+                      <input name="aliases" type="text" placeholder="예: 충성콤비, 충성콤비 M, 충성콤비네이션" />
+                    </label>
+                    <div id="recipeIngredients" class="line-items"></div>
+                    <button id="addRecipeIngredientButton" type="button" class="secondary-button">
+                      재료 한 줄 추가
+                    </button>
+                    <button type="submit" class="primary-button">메뉴 레시피 저장</button>
+                  </form>
+                </section>
+
+                <section class="sub-panel">
+                  <div class="section-heading">
+                    <div>
+                      <p class="section-label">목록</p>
+                      <h3>등록된 메뉴 레시피</h3>
+                    </div>
+                  </div>
+                  <ul id="menuRecipeList" class="activity-list"></ul>
+                </section>
+              </div>
+            </section>
+
             <section class="tab-panel" data-panel="receipt">
               <div class="sub-grid">
                 <section class="sub-panel">
@@ -278,15 +318,18 @@
                   <div class="section-heading compact-heading">
                     <div>
                       <p class="section-label">OCR</p>
-                      <h3>영수증 텍스트 미리 분석</h3>
+                      <h3>영수증 텍스트 자동 차감 검토</h3>
                     </div>
                   </div>
                   <textarea
                     id="ocrPreviewInput"
                     class="message-box"
-                    placeholder="영수증 텍스트를 붙여넣으면 등록 품목명과 매칭되는 항목을 미리 찾아줍니다."
+                    placeholder="영수증 텍스트를 붙여넣으면 등록된 메뉴 레시피를 기준으로 자동 차감 후보를 계산합니다."
                   ></textarea>
-                  <button id="runOcrPreviewButton" class="secondary-button" type="button">OCR 미리보기 실행</button>
+                  <div class="page-actions">
+                    <button id="runOcrPreviewButton" class="secondary-button" type="button">자동 차감 검토</button>
+                    <button id="confirmOcrDeductionButton" class="primary-button" type="button">자동 차감 확정</button>
+                  </div>
                   <div id="ocrPreviewResult" class="report-card"></div>
                 </section>
               </div>

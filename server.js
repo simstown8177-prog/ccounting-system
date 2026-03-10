@@ -144,6 +144,23 @@ async function handleApi(req, res) {
     });
   }
 
+  if (req.method === "GET" && pathname === "/api/export/inventory.csv") {
+    const store = await readStore();
+    const category = findById(store.categories, session.categoryId);
+    const user = category ? findById(category.users, session.userId) : null;
+    if (!category || !user) {
+      sessions.delete(getToken(req));
+      res.writeHead(401);
+      res.end("Unauthorized");
+      return;
+    }
+    return sendCsv(
+      res,
+      `${category.id}-inventory.csv`,
+      buildInventoryCsv(category),
+    );
+  }
+
   if (req.method === "POST" && pathname === "/api/push/subscribe") {
     const body = await readJson(req);
     return mutateCategory(
@@ -195,6 +212,24 @@ async function handleApi(req, res) {
         phone: body.phone,
         kakaoId: body.kakaoId || "",
       });
+    });
+  }
+
+  if (req.method === "POST" && pathname === "/api/menu-recipes") {
+    const body = await readJson(req);
+    return mutateCategory(res, session, (category, user) => {
+      requireRole(user, "manager");
+      validateRecipePayload(body);
+      const recipe = buildMenuRecipe(body);
+      category.menuRecipes = category.menuRecipes || [];
+      const existingIndex = category.menuRecipes.findIndex(
+        (entry) => entry.id === recipe.id || normalizeToken(entry.name) === normalizeToken(recipe.name),
+      );
+      if (existingIndex >= 0) {
+        category.menuRecipes[existingIndex] = recipe;
+      } else {
+        category.menuRecipes.unshift(recipe);
+      }
     });
   }
 
@@ -274,6 +309,54 @@ async function handleApi(req, res) {
         previewDataUrl: body.previewDataUrl || "",
         createdAt,
       });
+    });
+  }
+
+  if (req.method === "POST" && pathname === "/api/receipt-deductions/preview") {
+    const body = await readJson(req);
+    return mutateCategory(res, session, (category) => {
+      category.lastReceiptPreview = buildReceiptPreview(category, body.receiptText || "");
+    }, (category) => ({
+      category: sanitizeCategory(category),
+      receiptPreview: category.lastReceiptPreview,
+    }));
+  }
+
+  if (req.method === "POST" && pathname === "/api/receipt-deductions/confirm") {
+    const body = await readJson(req);
+    return mutateCategory(res, session, (category) => {
+      const preview = category.lastReceiptPreview;
+      if (!preview?.matchedMenus?.length) {
+        throw new Error("preview_required");
+      }
+
+      const receiptText = body.receiptText || preview.receiptText || "";
+      preview.matchedMenus.forEach((matchedMenu) => {
+        matchedMenu.ingredients.forEach((ingredient) => {
+          applyClosing(category, {
+            itemId: ingredient.itemId,
+            usedQuantity: ingredient.totalQuantity,
+            note: `${matchedMenu.menuName} ${matchedMenu.quantity}건 자동 차감`,
+            sourceLabel: "영수증 OCR 자동 차감",
+            createdAt: new Date().toISOString(),
+          });
+        });
+      });
+
+      category.receiptUploads.unshift({
+        id: crypto.randomUUID(),
+        fileName: body.fileName || "ocr-text",
+        fileSize: 0,
+        note: "영수증 OCR 자동 차감",
+        lines: preview.matchedMenus.map((matchedMenu) => ({
+          menuName: matchedMenu.menuName,
+          quantity: matchedMenu.quantity,
+        })),
+        previewDataUrl: "",
+        receiptText,
+        createdAt: new Date().toISOString(),
+      });
+      category.lastReceiptPreview = null;
     });
   }
 
@@ -411,6 +494,8 @@ function createInitialStore() {
       receiptUploads: [],
       pushSubscriptions: [],
       lastLowStockSignature: "",
+      menuRecipes: [],
+      lastReceiptPreview: null,
       kakaoConfig: {
         senderName: "샵앤샵 평택1호점",
         channelId: "",
@@ -429,6 +514,8 @@ function createSeedStore() {
     createItem("모짜렐라치즈", "kg", 3, 8),
     createItem("도우", "개", 12, 10),
     createItem("토마토소스", "통", 1, 3),
+    createItem("페퍼로니", "kg", 2, 4),
+    createItem("양파", "kg", 3, 4),
   ];
   pizza.vendors = [
     createVendor("평택유제품", "김대리", "010-2222-1111", "pt-cheese"),
@@ -437,11 +524,21 @@ function createSeedStore() {
   pizza.purchaseOrders = [
     createPurchaseOrder(pizza.items[0].id, pizza.vendors[0].id, 10, "ordered"),
   ];
+  pizza.menuRecipes = [
+    createMenuRecipe("충성콤비네이션M", ["충성콤비", "충성콤비네이션", "충성콤비 M"], [
+      createRecipeIngredient(pizza.items[1].id, "도우", "개", 1),
+      createRecipeIngredient(pizza.items[0].id, "모짜렐라치즈", "kg", 0.18),
+      createRecipeIngredient(pizza.items[2].id, "토마토소스", "통", 0.12),
+      createRecipeIngredient(pizza.items[3].id, "페퍼로니", "kg", 0.04),
+      createRecipeIngredient(pizza.items[4].id, "양파", "kg", 0.03),
+    ]),
+  ];
 
   meat.items = [
     createItem("삼겹살", "kg", 14, 12),
     createItem("상추", "box", 1, 2),
     createItem("참기름", "병", 2, 3),
+    createItem("쌈장", "통", 3, 2),
   ];
   meat.vendors = [
     createVendor("평택정육", "박실장", "010-4444-3333", "pt-meat"),
@@ -449,6 +546,14 @@ function createSeedStore() {
   ];
   meat.purchaseOrders = [
     createPurchaseOrder(meat.items[1].id, meat.vendors[1].id, 3, "received", 2),
+  ];
+  meat.menuRecipes = [
+    createMenuRecipe("삼겹살세트", ["삼겹세트", "삼겹 세트"], [
+      createRecipeIngredient(meat.items[0].id, "삼겹살", "kg", 0.22),
+      createRecipeIngredient(meat.items[1].id, "상추", "box", 0.08),
+      createRecipeIngredient(meat.items[2].id, "참기름", "병", 0.03),
+      createRecipeIngredient(meat.items[3].id, "쌈장", "통", 0.05),
+    ]),
   ];
   applyClosing(pizza, {
     itemId: pizza.items[0].id,
@@ -495,6 +600,25 @@ function createUser(categoryName, username, password) {
 
 function createItem(name, unit, currentStock, parStock) {
   return { id: crypto.randomUUID(), name, unit, currentStock, parStock };
+}
+
+function createMenuRecipe(name, aliases, ingredients) {
+  return {
+    id: crypto.randomUUID(),
+    name,
+    aliases,
+    ingredients,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function createRecipeIngredient(itemId, itemName, unit, quantity) {
+  return {
+    itemId,
+    itemName,
+    unit,
+    quantity,
+  };
 }
 
 function createVendor(name, contactPerson, phone, kakaoId) {
@@ -561,6 +685,12 @@ function sanitizeCategory(category) {
   return {
     ...category,
     users: category.users.map(sanitizeUser),
+    menuRecipes: (category.menuRecipes || []).map((recipe) => ({
+      ...recipe,
+      ingredients: recipe.ingredients || [],
+      aliases: recipe.aliases || [],
+    })),
+    lastReceiptPreview: category.lastReceiptPreview || null,
   };
 }
 
@@ -608,7 +738,24 @@ function migrateStore(store) {
       users: (category.users || []).map((user) => migrateUser(user)),
       pushSubscriptions: category.pushSubscriptions || [],
       lastLowStockSignature: category.lastLowStockSignature || "",
+      menuRecipes: (category.menuRecipes || []).map((recipe) => migrateMenuRecipe(recipe, category.items || [])),
+      lastReceiptPreview: category.lastReceiptPreview || null,
     })),
+  };
+}
+
+function migrateMenuRecipe(recipe, items) {
+  return {
+    id: recipe.id || crypto.randomUUID(),
+    name: recipe.name || "",
+    aliases: Array.isArray(recipe.aliases) ? recipe.aliases : [],
+    ingredients: (recipe.ingredients || []).map((ingredient) => ({
+      itemId: ingredient.itemId,
+      itemName: ingredient.itemName || findById(items, ingredient.itemId)?.name || "",
+      unit: ingredient.unit || findById(items, ingredient.itemId)?.unit || "",
+      quantity: number(ingredient.quantity),
+    })),
+    updatedAt: recipe.updatedAt || new Date().toISOString(),
   };
 }
 
@@ -640,14 +787,11 @@ function requireRole(user, requiredRole) {
 }
 
 function inferItemsFromReceiptText(category, receiptText) {
-  const normalized = String(receiptText).toLowerCase();
-  return category.items
-    .filter((item) => normalized.includes(String(item.name).toLowerCase()))
-    .map((item) => ({
-      itemId: item.id,
-      name: item.name,
-      suggestedQuantity: 1,
-    }));
+  return buildReceiptPreview(category, receiptText).matchedMenus.map((matchedMenu) => ({
+    name: matchedMenu.menuName,
+    suggestedQuantity: matchedMenu.quantity,
+    confidence: matchedMenu.confidence,
+  }));
 }
 
 async function configureWebPush() {
@@ -715,6 +859,14 @@ function sendJson(res, statusCode, payload) {
   res.end(JSON.stringify(payload));
 }
 
+function sendCsv(res, fileName, csvText) {
+  res.writeHead(200, {
+    "Content-Type": "text/csv; charset=utf-8",
+    "Content-Disposition": `attachment; filename="${fileName}"`,
+  });
+  res.end(`\uFEFF${csvText}`);
+}
+
 function readJson(req) {
   return new Promise((resolve, reject) => {
     let body = "";
@@ -747,4 +899,154 @@ function number(value) {
 
 function round(value) {
   return Math.round(value * 10) / 10;
+}
+
+function validateRecipePayload(body) {
+  if (!String(body.name || "").trim()) {
+    throw new Error("menu_name_required");
+  }
+
+  if (!Array.isArray(body.ingredients) || !body.ingredients.length) {
+    throw new Error("recipe_ingredients_required");
+  }
+}
+
+function buildMenuRecipe(body) {
+  return {
+    id: body.id || crypto.randomUUID(),
+    name: String(body.name || "").trim(),
+    aliases: String(body.aliases || "")
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean),
+    ingredients: (body.ingredients || []).map((ingredient) => ({
+      itemId: ingredient.itemId,
+      itemName: String(ingredient.itemName || "").trim(),
+      unit: String(ingredient.unit || "").trim(),
+      quantity: number(ingredient.quantity),
+    })).filter((ingredient) => ingredient.itemId && ingredient.quantity > 0),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function buildReceiptPreview(category, receiptText) {
+  const lines = String(receiptText || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const matchedMenus = [];
+  const unmatchedLines = [];
+
+  for (const line of lines) {
+    const parsed = parseReceiptLine(line);
+    if (!parsed.name) {
+      continue;
+    }
+
+    const match = findMenuRecipeMatch(category.menuRecipes || [], parsed.name);
+    if (!match) {
+      unmatchedLines.push(line);
+      continue;
+    }
+
+    matchedMenus.push({
+      menuId: match.id,
+      menuName: match.name,
+      quantity: parsed.quantity,
+      sourceLine: line,
+      confidence: match.confidence,
+      ingredients: match.ingredients.map((ingredient) => ({
+        ...ingredient,
+        totalQuantity: round(ingredient.quantity * parsed.quantity),
+      })),
+    });
+  }
+
+  return {
+    requestedAt: new Date().toISOString(),
+    receiptText,
+    matchedMenus,
+    unmatchedLines,
+  };
+}
+
+function parseReceiptLine(line) {
+  const cleaned = String(line || "").trim();
+  const tokens = cleaned.split(/\s+/);
+  let quantity = 1;
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index];
+    if (/^\d+$/.test(token) && Number(token) > 0 && Number(token) <= 20) {
+      quantity = Number(token);
+      tokens.splice(index, 1);
+      break;
+    }
+  }
+  const name = tokens.join(" ").replace(/\d[\d,]*원.*$/, "").trim();
+  return {
+    name: normalizeToken(name),
+    quantity,
+  };
+}
+
+function findMenuRecipeMatch(menuRecipes, inputName) {
+  const normalizedInput = normalizeToken(inputName);
+  if (!normalizedInput) {
+    return null;
+  }
+
+  let best = null;
+  for (const recipe of menuRecipes) {
+    const names = [recipe.name, ...(recipe.aliases || [])]
+      .map((entry) => normalizeToken(entry))
+      .filter(Boolean);
+    if (names.includes(normalizedInput)) {
+      return { ...recipe, confidence: "exact" };
+    }
+    const partialMatch = names.find((entry) => normalizedInput.includes(entry) || entry.includes(normalizedInput));
+    if (partialMatch && !best) {
+      best = { ...recipe, confidence: "partial" };
+    }
+  }
+  return best;
+}
+
+function normalizeToken(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/[()\-_/]/g, "");
+}
+
+function buildInventoryCsv(category) {
+  const headers = [
+    "카테고리",
+    "품목명",
+    "현재재고",
+    "기준재고",
+    "단위",
+    "부족수량",
+    "상태",
+  ];
+  const rows = (category.items || []).map((item) => {
+    const shortage = round(Math.max(0, item.parStock - item.currentStock));
+    return [
+      category.name,
+      item.name,
+      item.currentStock,
+      item.parStock,
+      item.unit,
+      shortage,
+      shortage > 0 ? "경고" : "정상",
+    ];
+  });
+
+  return [headers, ...rows]
+    .map((row) => row.map(escapeCsvCell).join(","))
+    .join("\n");
+}
+
+function escapeCsvCell(value) {
+  const text = String(value ?? "");
+  return /[",\n]/.test(text) ? `"${text.replace(/"/g, "\"\"")}"` : text;
 }

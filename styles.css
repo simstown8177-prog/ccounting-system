@@ -390,6 +390,13 @@ h3 {
   min-width: 0;
 }
 
+.workspace-content .surface-card,
+.workspace-content .sub-panel,
+.workspace-content .metric-card,
+.workspace-content .report-card {
+  box-shadow: none;
+}
+
 .tab-panel {
   display: none;
 }
@@ -521,6 +528,18 @@ tbody tr.low-stock {
   font-weight: 600;
 }
 
+.preview-block {
+  display: grid;
+  gap: 6px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.preview-block:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
 .critical-alert {
   color: var(--warning);
   background: #fffaf2;
@@ -545,6 +564,61 @@ tbody tr.low-stock {
 
 .hidden {
   display: none !important;
+}
+
+@media (min-width: 721px) and (max-width: 1180px) {
+  .page-shell {
+    padding: 18px 18px 36px;
+  }
+
+  .topbar {
+    padding: 14px 16px;
+  }
+
+  .page-actions {
+    gap: 8px;
+  }
+
+  .hero-card,
+  .workspace-hero {
+    grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.8fr);
+    padding: 22px;
+  }
+
+  .workspace-layout {
+    grid-template-columns: 190px minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .workspace-sidebar {
+    top: 84px;
+    padding: 14px 12px;
+  }
+
+  .sidebar-nav .tab-button {
+    min-height: 40px;
+    padding: 0 12px;
+    font-size: 0.93rem;
+  }
+
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sub-grid,
+  .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .line-item {
+    grid-template-columns: minmax(0, 1fr) 130px 92px;
+  }
+
+  th,
+  td {
+    padding: 13px 12px;
+    font-size: 0.92rem;
+  }
 }
 
 @media (max-width: 1080px) {
@@ -575,12 +649,14 @@ tbody tr.low-stock {
 
 @media (max-width: 720px) {
   .page-shell {
-    padding: 16px 14px 32px;
+    padding: 10px 10px 24px;
   }
 
   .topbar {
-    border-radius: var(--radius-md);
-    padding: 16px;
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    gap: 12px;
+    margin-bottom: 12px;
   }
 
   .topbar,
@@ -590,18 +666,178 @@ tbody tr.low-stock {
     display: grid;
   }
 
+  .page-actions > * {
+    width: 100%;
+  }
+
   .brand-lockup {
     align-items: flex-start;
+    gap: 10px;
+  }
+
+  .brand-mark {
+    width: 38px;
+    height: 38px;
   }
 
   .hero-card,
   .workspace-hero,
   .surface-card,
   .sub-panel {
-    padding: 20px;
+    padding: 14px;
+  }
+
+  .hero-card,
+  .workspace-hero {
+    gap: 14px;
+  }
+
+  .workspace-hero-meta,
+  .stats,
+  .card-stats {
+    gap: 8px;
+  }
+
+  .workspace-layout {
+    gap: 10px;
+  }
+
+  .workspace-sidebar {
+    padding: 10px;
+    overflow-x: auto;
+  }
+
+  .sidebar-nav {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    padding-bottom: 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .sidebar-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sidebar-nav .tab-button {
+    flex: 0 0 auto;
+    min-height: 38px;
+    padding: 0 12px;
+    white-space: nowrap;
+    font-size: 0.88rem;
+  }
+
+  .workspace-content {
+    padding: 12px;
+  }
+
+  .workspace-body,
+  .tab-panel {
+    gap: 12px;
+  }
+
+  .summary-grid,
+  .sub-grid,
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .metric-card,
+  .sub-panel {
+    padding: 14px;
+  }
+
+  .metric-card strong {
+    font-size: 1.55rem;
+  }
+
+  .section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .stat-chip,
+  .status-chip {
+    min-height: 32px;
+    padding: 6px 10px;
+    font-size: 0.84rem;
+  }
+
+  label {
+    gap: 6px;
+    font-size: 0.9rem;
+  }
+
+  input,
+  select,
+  textarea {
+    padding: 12px;
+    font-size: 16px;
+  }
+
+  .message-box {
+    min-height: 112px;
+  }
+
+  .table-wrap {
+    margin: 0 -2px;
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0;
+  }
+
+  table {
+    min-width: 640px;
+  }
+
+  th,
+  td {
+    padding: 12px 10px;
+    font-size: 0.88rem;
+  }
+
+  .activity-list {
+    gap: 8px;
+  }
+
+  .activity-item,
+  .empty-state,
+  .selected-category,
+  .report-card,
+  .critical-alert,
+  .inline-error {
+    padding: 12px;
+  }
+
+  .line-item {
+    gap: 8px;
+  }
+
+  .auth-layout {
+    gap: 12px;
   }
 
   h1 {
-    font-size: 1.9rem;
+    font-size: 1.6rem;
+    line-height: 1.14;
+  }
+
+  h2 {
+    font-size: 1.25rem;
+  }
+
+  h3 {
+    font-size: 1rem;
+  }
+
+  .helper-text,
+  .hero-copy,
+  .activity-meta,
+  .summary-line {
+    font-size: 0.92rem;
   }
 }
