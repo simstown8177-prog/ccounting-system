@@ -43,6 +43,7 @@ const elements = {
   purchaseForm: document.querySelector("#purchaseForm"),
   receiptForm: document.querySelector("#receiptForm"),
   receiptUploadForm: document.querySelector("#receiptUploadForm"),
+  resetRecipeFormButton: document.querySelector("#resetRecipeFormButton"),
   menuRecipeForm: document.querySelector("#menuRecipeForm"),
   ocrPreviewInput: document.querySelector("#ocrPreviewInput"),
   runOcrPreviewButton: document.querySelector("#runOcrPreviewButton"),
@@ -58,9 +59,7 @@ const elements = {
   purchaseItemSelect: document.querySelector('#purchaseForm select[name="itemId"]'),
   purchaseVendorSelect: document.querySelector('#purchaseForm select[name="vendorId"]'),
   receiptOrderSelect: document.querySelector('#receiptForm select[name="purchaseOrderId"]'),
-  receiptLineItems: document.querySelector("#receiptLineItems"),
   recipeIngredients: document.querySelector("#recipeIngredients"),
-  addReceiptLineButton: document.querySelector("#addReceiptLineButton"),
   addRecipeIngredientButton: document.querySelector("#addRecipeIngredientButton"),
   kakaoForm: document.querySelector("#kakaoForm"),
   kakaoMessageOutput: document.querySelector("#kakaoMessageOutput"),
@@ -91,11 +90,11 @@ function bindEvents() {
   elements.userForm.addEventListener("submit", handleUserSubmit);
   elements.purchaseForm.addEventListener("submit", handlePurchaseSubmit);
   elements.receiptForm.addEventListener("submit", handleReceiptSubmit);
-  elements.receiptUploadForm.addEventListener("submit", handleReceiptUploadSubmit);
+  elements.receiptUploadForm.addEventListener("submit", suppressSubmit);
+  elements.resetRecipeFormButton.addEventListener("click", resetRecipeForm);
   elements.menuRecipeForm.addEventListener("submit", handleMenuRecipeSubmit);
   elements.runOcrPreviewButton.addEventListener("click", handleOcrPreview);
   elements.confirmOcrDeductionButton.addEventListener("click", handleOcrDeductionConfirm);
-  elements.addReceiptLineButton.addEventListener("click", addReceiptLineRow);
   elements.addRecipeIngredientButton.addEventListener("click", addRecipeIngredientRow);
   elements.kakaoForm.addEventListener("submit", handleKakaoSubmit);
   elements.copyKakaoMessageButton.addEventListener("click", copyKakaoMessage);
@@ -400,7 +399,7 @@ function renderReceiptUploadList(category) {
     category.receiptUploads.map((upload) => `
       <li class="activity-item">
         <p class="activity-title">${upload.fileName}</p>
-        <p class="activity-meta">${upload.lines.length}개 항목 · ${upload.note || "메모 없음"} · ${formatDateTime(upload.createdAt)}</p>
+        <p class="activity-meta">${describeReceiptUpload(upload)} · ${upload.note || "메모 없음"} · ${formatDateTime(upload.createdAt)}</p>
       </li>
     `),
   );
@@ -453,7 +452,7 @@ function renderKakaoSection(category) {
 function renderOcrPreview(category) {
   const preview = category.lastReceiptPreview;
   if (!preview) {
-    elements.ocrPreviewResult.innerHTML = "영수증 텍스트를 넣고 자동 차감 검토를 실행하면 메뉴별 차감 예정 재료가 표시됩니다.";
+    elements.ocrPreviewResult.innerHTML = "영수증 파일을 고르고 OCR 텍스트를 넣은 뒤 자동 차감 검토를 실행하면 메뉴별 차감 예정 재료가 표시됩니다.";
     elements.confirmOcrDeductionButton.disabled = true;
     return;
   }
@@ -470,7 +469,7 @@ function renderOcrPreview(category) {
     .map((menu) => `
       <div class="preview-block">
         <strong>${menu.menuName}</strong>
-        <div class="summary-line">영수증 라인: ${menu.sourceLine}</div>
+        <div class="summary-line">영수증 라인: ${(menu.sourceLines || []).join(" / ")}</div>
         <div class="summary-line">수량 ${formatQuantity(menu.quantity)} · 신뢰도 ${menu.confidence}</div>
         <div class="summary-line">${menu.ingredients.map((ingredient) => `${ingredient.itemName} ${formatQuantity(ingredient.totalQuantity)} ${ingredient.unit}`).join(" / ")}</div>
       </div>
@@ -631,37 +630,8 @@ async function handleReceiptSubmit(event) {
   }
 }
 
-async function handleReceiptUploadSubmit(event) {
+function suppressSubmit(event) {
   event.preventDefault();
-  const formData = new FormData(event.currentTarget);
-  const files = formData.getAll("receiptImage").filter((file) => file && file.size > 0);
-  const lines = readReceiptRows();
-
-  if (!files.length) {
-    window.alert("영수증 파일을 한 개 이상 선택하세요.");
-    return;
-  }
-
-  if (!lines.length) {
-    window.alert("차감할 품목을 한 줄 이상 입력하세요.");
-    return;
-  }
-
-  const filePayloads = await Promise.all(
-    files.map(async (file) => ({
-      fileName: file.name,
-      fileSize: file.size,
-      previewDataUrl: file.type.startsWith("image/") ? await fileToDataUrl(file) : "",
-    })),
-  );
-  await mutateWorkspace("/api/receipt-uploads", {
-    files: filePayloads,
-    note: String(formData.get("note")).trim(),
-    lines,
-  });
-  event.currentTarget.reset();
-  elements.receiptLineItems.innerHTML = "";
-  addReceiptLineRow();
 }
 
 async function handleMenuRecipeSubmit(event) {
@@ -679,10 +649,7 @@ async function handleMenuRecipeSubmit(event) {
     aliases: String(formData.get("aliases")).trim(),
     ingredients,
   });
-  event.currentTarget.reset();
-  elements.menuRecipeForm.elements.id.value = "";
-  elements.recipeIngredients.innerHTML = "";
-  addRecipeIngredientRow();
+  resetRecipeForm();
 }
 
 async function handleKakaoSubmit(event) {
@@ -697,6 +664,12 @@ async function handleKakaoSubmit(event) {
 
 async function handleKakaoSimulation() {
   try {
+    const draftConfig = readKakaoConfig();
+    if (!draftConfig.senderName || !draftConfig.channelId) {
+      window.alert("카카오 발신 매장명과 채널/ID를 먼저 입력하세요.");
+      return;
+    }
+    await mutateWorkspace("/api/kakao-config", draftConfig);
     const response = await apiFetch("/api/integrations/kakao/send-order", {
       method: "POST",
       body: JSON.stringify({ message: elements.kakaoMessageOutput.value }),
@@ -704,9 +677,7 @@ async function handleKakaoSimulation() {
     state.workspaceCategory.lastKakaoDispatch = response.kakao.lastDispatch;
     state.workspaceCategory.kakaoConfig = {
       ...(state.workspaceCategory.kakaoConfig || {}),
-      senderName: elements.kakaoForm.elements.senderName.value,
-      channelId: elements.kakaoForm.elements.channelId.value,
-      notes: elements.kakaoForm.elements.notes.value,
+      ...draftConfig,
     };
     renderKakaoSection(state.workspaceCategory);
   } catch (error) {
@@ -715,15 +686,13 @@ async function handleKakaoSimulation() {
 }
 
 async function handleOcrPreview() {
-  const receiptText = String(elements.ocrPreviewInput.value || "").trim();
-  if (!receiptText) {
+  const payload = await buildReceiptDeductionPayload();
+  if (!payload.receiptText) {
     window.alert("영수증 OCR 텍스트를 입력하세요.");
     return;
   }
   try {
-    const response = await mutateWorkspace("/api/receipt-deductions/preview", {
-      receiptText,
-    });
+    const response = await mutateWorkspace("/api/receipt-deductions/preview", payload);
     state.workspaceCategory.lastReceiptPreview = response.receiptPreview;
     renderOcrPreview(state.workspaceCategory);
   } catch (error) {
@@ -732,17 +701,15 @@ async function handleOcrPreview() {
 }
 
 async function handleOcrDeductionConfirm() {
-  if (!state.workspaceCategory?.lastReceiptPreview?.matchedMenus?.length) {
+  if (!state.workspaceCategory?.lastReceiptPreview) {
     window.alert("먼저 자동 차감 검토를 실행하세요.");
     return;
   }
 
   try {
-    await mutateWorkspace("/api/receipt-deductions/confirm", {
-      receiptText: elements.ocrPreviewInput.value,
-      fileName: "ocr-auto-deduction",
-    });
-    elements.ocrPreviewInput.value = "";
+    const payload = await buildReceiptDeductionPayload();
+    await mutateWorkspace("/api/receipt-deductions/confirm", payload);
+    resetReceiptDeductionForm();
   } catch (error) {
     handleWorkspaceError(error, "자동 차감 확정 중 오류가 발생했습니다.");
   }
@@ -771,7 +738,15 @@ function handleWorkspaceError(error, fallbackMessage) {
     return;
   }
 
-  window.alert(fallbackMessage);
+  const messageMap = {
+    menu_name_required: "판매 메뉴명을 입력하세요.",
+    recipe_ingredients_required: "레시피 재료를 한 줄 이상 입력하세요.",
+    recipe_ingredient_item_not_found: "레시피 재료 품목이 유효하지 않습니다. 품목을 다시 선택하세요.",
+    preview_required: "자동 차감 검토 결과가 없습니다. OCR 텍스트를 다시 검토하세요.",
+    receipt_files_required: "영수증 파일을 한 개 이상 선택하세요.",
+  };
+
+  window.alert(messageMap[error.message] || fallbackMessage);
 }
 
 function handleInventorySearch(event) {
@@ -860,19 +835,6 @@ function updateSidebarAlertsButton() {
   elements.sidebarAlertsButton.disabled = Boolean(pushSubscribed);
 }
 
-function addReceiptLineRow() {
-  const items = state.workspaceCategory?.items || [];
-  const wrapper = document.createElement("div");
-  wrapper.className = "line-item";
-  wrapper.innerHTML = `
-    <select name="receiptItemId" required>${buildItemOptions(items)}</select>
-    <input name="receiptQuantity" type="number" min="0.1" step="0.1" placeholder="차감 수량" required />
-    <button type="button" class="secondary-button">삭제</button>
-  `;
-  wrapper.querySelector("button").addEventListener("click", () => wrapper.remove());
-  elements.receiptLineItems.appendChild(wrapper);
-}
-
 function addRecipeIngredientRow(existing = null) {
   const items = state.workspaceCategory?.items || [];
   const wrapper = document.createElement("div");
@@ -891,21 +853,9 @@ function addRecipeIngredientRow(existing = null) {
 }
 
 function syncReceiptLineRows(category) {
-  if (state.activeTab === "receipt" && !elements.receiptLineItems.children.length && category.items.length) {
-    addReceiptLineRow();
-  }
   if (state.activeTab === "recipes" && !elements.recipeIngredients.children.length && category.items.length) {
     addRecipeIngredientRow();
   }
-}
-
-function readReceiptRows() {
-  return [...elements.receiptLineItems.querySelectorAll(".line-item")]
-    .map((row) => ({
-      itemId: row.querySelector('[name="receiptItemId"]').value,
-      quantity: Number(row.querySelector('[name="receiptQuantity"]').value),
-    }))
-    .filter((row) => row.itemId && row.quantity > 0);
 }
 
 function readRecipeIngredients() {
@@ -993,6 +943,57 @@ function handleMenuRecipeListAction(event) {
   if (button.dataset.action === "delete-recipe" && window.confirm("이 메뉴 레시피를 삭제할까요?")) {
     mutateWorkspace("/api/menu-recipes/delete", { id: recipe.id });
   }
+}
+
+function resetRecipeForm() {
+  elements.menuRecipeForm.reset();
+  elements.menuRecipeForm.elements.id.value = "";
+  elements.recipeIngredients.innerHTML = "";
+  addRecipeIngredientRow();
+}
+
+async function buildReceiptDeductionPayload() {
+  const formData = new FormData(elements.receiptUploadForm);
+  const files = formData.getAll("receiptImage").filter((file) => file && file.size > 0);
+  const receiptText = String(elements.ocrPreviewInput.value || "").trim();
+  const filePayloads = await Promise.all(
+    files.map(async (file) => ({
+      fileName: file.name,
+      fileSize: file.size,
+      previewDataUrl: file.type.startsWith("image/") ? await fileToDataUrl(file) : "",
+    })),
+  );
+
+  return {
+    files: filePayloads,
+    receiptText,
+    note: String(formData.get("note") || "").trim(),
+  };
+}
+
+function resetReceiptDeductionForm() {
+  elements.receiptUploadForm.reset();
+  elements.ocrPreviewInput.value = "";
+  state.workspaceCategory.lastReceiptPreview = null;
+  renderOcrPreview(state.workspaceCategory);
+}
+
+function readKakaoConfig() {
+  return {
+    senderName: String(elements.kakaoForm.elements.senderName.value || "").trim(),
+    channelId: String(elements.kakaoForm.elements.channelId.value || "").trim(),
+    notes: String(elements.kakaoForm.elements.notes.value || "").trim(),
+  };
+}
+
+function describeReceiptUpload(upload) {
+  if (upload.receiptCount) {
+    return `${upload.receiptCount}개 영수증 · ${upload.lines.length}개 메뉴`;
+  }
+  if (upload.lines?.length) {
+    return `${upload.lines.length}개 항목`;
+  }
+  return "기록";
 }
 
 function fileToDataUrl(file) {

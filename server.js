@@ -264,8 +264,8 @@ async function handleApi(req, res) {
     const body = await readJson(req);
     return mutateCategory(res, session, (category, user) => {
       requireRole(user, "manager");
-      validateRecipePayload(body);
-      const recipe = buildMenuRecipe(body);
+      validateRecipePayload(body, category.items);
+      const recipe = buildMenuRecipe(body, category.items);
       category.menuRecipes = category.menuRecipes || [];
       const existingIndex = category.menuRecipes.findIndex(
         (entry) => entry.id === recipe.id || normalizeToken(entry.name) === normalizeToken(recipe.name),
@@ -359,7 +359,7 @@ async function handleApi(req, res) {
   if (req.method === "POST" && pathname === "/api/receipt-deductions/preview") {
     const body = await readJson(req);
     return mutateCategory(res, session, (category) => {
-      category.lastReceiptPreview = buildReceiptPreview(category, body.receiptText || "");
+      category.lastReceiptPreview = buildReceiptPreview(category, body.receiptText || "", body.files || []);
     }, (category) => ({
       category: sanitizeCategory(category),
       receiptPreview: category.lastReceiptPreview,
@@ -369,12 +369,15 @@ async function handleApi(req, res) {
   if (req.method === "POST" && pathname === "/api/receipt-deductions/confirm") {
     const body = await readJson(req);
     return mutateCategory(res, session, (category) => {
-      const preview = category.lastReceiptPreview;
-      if (!preview?.matchedMenus?.length) {
+      const receiptText = String(body.receiptText || "").trim();
+      const files = Array.isArray(body.files) ? body.files : [];
+      const note = String(body.note || "").trim();
+      const preview = buildReceiptPreview(category, receiptText, files);
+      if (!preview.matchedMenus.length) {
         throw new Error("preview_required");
       }
 
-      const receiptText = body.receiptText || preview.receiptText || "";
+      const createdAt = new Date().toISOString();
       preview.matchedMenus.forEach((matchedMenu) => {
         matchedMenu.ingredients.forEach((ingredient) => {
           applyStockDeduction(category, {
@@ -382,23 +385,59 @@ async function handleApi(req, res) {
             usedQuantity: ingredient.totalQuantity,
             note: `${matchedMenu.menuName} ${matchedMenu.quantity}건 자동 차감`,
             sourceLabel: "영수증 OCR 자동 차감",
-            createdAt: new Date().toISOString(),
+            createdAt,
           });
         });
       });
 
-      category.receiptUploads.unshift({
-        id: crypto.randomUUID(),
-        fileName: body.fileName || "ocr-text",
-        fileSize: 0,
-        note: "영수증 OCR 자동 차감",
-        lines: preview.matchedMenus.map((matchedMenu) => ({
-          menuName: matchedMenu.menuName,
-          quantity: matchedMenu.quantity,
-        })),
-        previewDataUrl: "",
-        receiptText,
-        createdAt: new Date().toISOString(),
+      const uploadEntries = files.length
+        ? files
+        : [{ fileName: "ocr-auto-deduction", fileSize: 0, previewDataUrl: "" }];
+
+      uploadEntries.forEach((file) => {
+        category.receiptUploads.unshift({
+          id: crypto.randomUUID(),
+          fileName: file.fileName || "ocr-auto-deduction",
+          fileSize: number(file.fileSize),
+          note: note || "영수증 OCR 자동 차감",
+          lines: preview.matchedMenus.map((matchedMenu) => ({
+            menuName: matchedMenu.menuName,
+            quantity: matchedMenu.quantity,
+          })),
+          receiptCount: uploadEntries.length,
+          previewDataUrl: file.previewDataUrl || "",
+          receiptText,
+          createdAt,
+        });
+      });
+      category.lastReceiptPreview = null;
+    }, (category) => ({
+      category: sanitizeCategory(category),
+      receiptPreview: null,
+    }));
+  }
+
+  if (req.method === "POST" && pathname === "/api/receipt-deductions/upload-only") {
+    const body = await readJson(req);
+    return mutateCategory(res, session, (category) => {
+      const createdAt = new Date().toISOString();
+      const files = Array.isArray(body.files) ? body.files : [];
+      if (!files.length) {
+        throw new Error("receipt_files_required");
+      }
+
+      files.forEach((file) => {
+        category.receiptUploads.unshift({
+          id: crypto.randomUUID(),
+          fileName: file.fileName,
+          fileSize: number(file.fileSize),
+          note: String(body.note || "").trim() || "영수증 파일 업로드",
+          lines: [],
+          receiptCount: files.length,
+          previewDataUrl: file.previewDataUrl || "",
+          receiptText: "",
+          createdAt,
+        });
       });
       category.lastReceiptPreview = null;
     });
@@ -935,7 +974,7 @@ function round(value) {
   return Math.round(value * 10) / 10;
 }
 
-function validateRecipePayload(body) {
+function validateRecipePayload(body, items) {
   if (!String(body.name || "").trim()) {
     throw new Error("menu_name_required");
   }
@@ -943,9 +982,20 @@ function validateRecipePayload(body) {
   if (!Array.isArray(body.ingredients) || !body.ingredients.length) {
     throw new Error("recipe_ingredients_required");
   }
+
+  const validIngredients = body.ingredients.filter((ingredient) => {
+    if (!ingredient?.itemId || number(ingredient.quantity) <= 0) {
+      return false;
+    }
+    return Boolean(findById(items, ingredient.itemId));
+  });
+
+  if (!validIngredients.length) {
+    throw new Error("recipe_ingredient_item_not_found");
+  }
 }
 
-function buildMenuRecipe(body) {
+function buildMenuRecipe(body, items) {
   return {
     id: body.id || crypto.randomUUID(),
     name: String(body.name || "").trim(),
@@ -953,17 +1003,20 @@ function buildMenuRecipe(body) {
       .split(",")
       .map((entry) => entry.trim())
       .filter(Boolean),
-    ingredients: (body.ingredients || []).map((ingredient) => ({
-      itemId: ingredient.itemId,
-      itemName: String(ingredient.itemName || "").trim(),
-      unit: String(ingredient.unit || "").trim(),
-      quantity: number(ingredient.quantity),
-    })).filter((ingredient) => ingredient.itemId && ingredient.quantity > 0),
+    ingredients: (body.ingredients || []).map((ingredient) => {
+      const item = findById(items, ingredient.itemId);
+      return {
+        itemId: ingredient.itemId,
+        itemName: item?.name || "",
+        unit: item?.unit || "",
+        quantity: number(ingredient.quantity),
+      };
+    }).filter((ingredient) => ingredient.itemId && ingredient.quantity > 0),
     updatedAt: new Date().toISOString(),
   };
 }
 
-function buildReceiptPreview(category, receiptText) {
+function buildReceiptPreview(category, receiptText, files = []) {
   const lines = String(receiptText || "")
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -983,11 +1036,25 @@ function buildReceiptPreview(category, receiptText) {
       continue;
     }
 
+    const existing = matchedMenus.find((entry) => entry.menuId === match.id);
+    if (existing) {
+      existing.quantity = round(existing.quantity + parsed.quantity);
+      existing.sourceLines.push(line);
+      existing.ingredients = existing.ingredients.map((ingredient) => ({
+        ...ingredient,
+        totalQuantity: round(ingredient.totalQuantity + ingredient.quantity * parsed.quantity),
+      }));
+      if (existing.confidence !== "exact" && match.confidence === "exact") {
+        existing.confidence = "exact";
+      }
+      continue;
+    }
+
     matchedMenus.push({
       menuId: match.id,
       menuName: match.name,
       quantity: parsed.quantity,
-      sourceLine: line,
+      sourceLines: [line],
       confidence: match.confidence,
       ingredients: match.ingredients.map((ingredient) => ({
         ...ingredient,
@@ -999,6 +1066,10 @@ function buildReceiptPreview(category, receiptText) {
   return {
     requestedAt: new Date().toISOString(),
     receiptText,
+    files: files.map((file) => ({
+      fileName: file.fileName || "",
+      fileSize: number(file.fileSize),
+    })),
     matchedMenus,
     unmatchedLines,
   };
@@ -1006,21 +1077,48 @@ function buildReceiptPreview(category, receiptText) {
 
 function parseReceiptLine(line) {
   const cleaned = String(line || "").trim();
+  if (shouldIgnoreReceiptLine(cleaned)) {
+    return { name: "", quantity: 0 };
+  }
+
   const tokens = cleaned.split(/\s+/);
   let quantity = 1;
   for (let index = 0; index < tokens.length; index += 1) {
     const token = tokens[index];
-    if (/^\d+$/.test(token) && Number(token) > 0 && Number(token) <= 20) {
-      quantity = Number(token);
+    const normalizedToken = token.toLowerCase();
+    if (/^x?\d+$/.test(normalizedToken) && Number(normalizedToken.replace("x", "")) > 0 && Number(normalizedToken.replace("x", "")) <= 20) {
+      quantity = Number(normalizedToken.replace("x", ""));
+      tokens.splice(index, 1);
+      break;
+    }
+    if (/^\d+(개|ea|잔|판)$/i.test(normalizedToken)) {
+      quantity = Number(normalizedToken.replace(/(개|ea|잔|판)$/i, ""));
       tokens.splice(index, 1);
       break;
     }
   }
-  const name = tokens.join(" ").replace(/\d[\d,]*원.*$/, "").trim();
+  const name = tokens
+    .join(" ")
+    .replace(/\d[\d,]*원.*$/, "")
+    .replace(/[xX]\d+$/, "")
+    .trim();
   return {
     name: normalizeToken(name),
     quantity,
   };
+}
+
+function shouldIgnoreReceiptLine(line) {
+  const normalized = normalizeToken(line);
+  if (!normalized) {
+    return true;
+  }
+
+  if (/^(합계|총액|카드|승인|전화|사업자|주문번호|매장명|주소|vat|부가세)/.test(String(line).trim().toLowerCase())) {
+    return true;
+  }
+
+  return /^[\d,.:/-]+$/.test(normalized);
 }
 
 function findMenuRecipeMatch(menuRecipes, inputName) {
