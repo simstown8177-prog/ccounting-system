@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>재고관리 | 샵앤샵 평택1호점</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page-shell workspace-shell">
+      <header class="topbar workspace-topbar">
+        <a class="brand-lockup" href="/">
+          <span class="brand-mark">S</span>
+          <span>
+            <strong id="workspaceBrandTitle">샵앤샵 평택1호점</strong>
+            <small>Workspace</small>
+          </span>
+        </a>
+        <div class="page-actions">
+          <a class="secondary-button button-link" href="/">메인</a>
+          <button id="enableAlertsButton" class="secondary-button" type="button">브라우저 알림</button>
+          <button id="logoutButton" class="primary-button" type="button">로그아웃</button>
+        </div>
+      </header>
+
+      <main class="page-stack">
+        <section class="workspace-hero surface-card">
+          <div>
+            <p class="eyebrow">Workspace</p>
+            <h1 id="workspaceTitle">매장 재고 관리</h1>
+            <p id="workspaceSubtitle" class="hero-copy">카테고리별 재고를 한 화면에서 정리합니다.</p>
+          </div>
+          <div class="workspace-hero-meta">
+            <span id="currentCategoryBadge" class="stat-chip"></span>
+            <span id="currentUserBadge" class="stat-chip"></span>
+          </div>
+        </section>
+
+        <section class="surface-card">
+          <nav id="workspaceTabs" class="tab-strip">
+            <button class="tab-button active" data-tab="overview" type="button">개요</button>
+            <button class="tab-button" data-tab="items" type="button">재고</button>
+            <button class="tab-button" data-tab="vendors" type="button">거래처</button>
+            <button class="tab-button" data-tab="orders" type="button">발주/입고</button>
+            <button class="tab-button" data-tab="receipt" type="button">영수증 차감</button>
+            <button class="tab-button" data-tab="closing" type="button">마감 리포트</button>
+            <button class="tab-button" data-tab="users" type="button">사용자</button>
+            <button class="tab-button" data-tab="kakao" type="button">카카오 알림</button>
+          </nav>
+
+          <div class="workspace-body">
+            <section class="tab-panel active" data-panel="overview">
+              <div id="workspaceAlert" class="critical-alert hidden"></div>
+              <div class="summary-grid">
+                <div class="metric-card">
+                  <p class="metric-label">등록 품목</p>
+                  <strong id="metricItems"></strong>
+                </div>
+                <div class="metric-card">
+                  <p class="metric-label">기준 재고 이하</p>
+                  <strong id="metricLowStock"></strong>
+                </div>
+                <div class="metric-card">
+                  <p class="metric-label">미입고 발주</p>
+                  <strong id="metricOpenOrders"></strong>
+                </div>
+                <div class="metric-card">
+                  <p class="metric-label">오늘 차감 건수</p>
+                  <strong id="metricTodayClosings"></strong>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>품목</th>
+                      <th>현재 재고</th>
+                      <th>기준 재고</th>
+                      <th>부족 수량</th>
+                      <th>상태</th>
+                    </tr>
+                  </thead>
+                  <tbody id="inventoryTableBody"></tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="tab-panel" data-panel="items">
+              <div class="sub-grid">
+                <section class="sub-panel">
+                  <div class="section-heading">
+                    <div>
+                      <p class="section-label">품목</p>
+                      <h3>재고 품목 등록</h3>
+                    </div>
+                  </div>
+                  <form id="itemForm" class="form-grid">
+                    <label>
+                      품목명
+                      <input name="name" type="text" placeholder="예: 양파" required />
+                    </label>
+                    <label>
+                      단위
+                      <input name="unit" type="text" placeholder="예: kg, 개, 봉" required />
+                    </label>
+                    <label>
+                      현재 재고
+                      <input name="currentStock" type="number" min="0" step="0.1" required />
+                    </label>
+                    <label>
+                      기준 재고
+                      <input name="parStock" type="number" min="0" step="0.1" required />
+                    </label>
+                    <button type="submit" class="primary-button">품목 추가</button>
+                  </form>
+                </section>
+
+                <section class="sub-panel">
+                  <div class="section-heading">
+                    <div>
+                      <p class="section-label">현황</p>
+                      <h3>현재 품목 목록</h3>
+                    </div>
+                  </div>
+                  <ul id="itemList" class="activity-list"></ul>
+                </section>
+              </div>
+            </section>
+
+            <section class="tab-panel" data-panel="vendors">
+              <div class="sub-grid">
+                <section class="sub-panel">
+                  <div class="section-heading">
+                    <div>
+                      <p class="section-label">거래처</p>
+                      <h3>거래처 등록</h3>
+                    </div>
+                  </div>
+                  <form id="vendorForm" class="form-grid">
+                    <label>
+                      거래처명
+                      <input name="name" type="text" placeholder="예: 평택식자재" required />
+                    </label>
+                    <label>
+                      담당자
+                      <input name="contactPerson" type="text" placeholder="예: 김대리" required />
+                    </label>
+                    <label>
+                      전화번호
+                      <input name="phone" type="tel" placeholder="예: 010-1234-5678" required />
+                    </label>
+                    <label>
+                      카카오 ID/채널
+                      <input name="kakaoId" type="text" placeholder="예: pytaek-food" />
+                    </label>
+                    <button type="submit" class="primary-button">거래처 추가</button>
+                  </form>
+                </section>
+
+                <section class="sub-panel">
+                  <div class="section-heading">
+                    <div>
+                      <p class="section-label">목록</p>
+                      <h3>등록 거래처</h3>
+                    </div>
+                  </div>
+                  <ul id="vendorList" class="activity-list"></ul>
+                </section>
+              </div>
+            </section>
+
+            <section class="tab-panel" data-panel="orders">
+              <div class="sub-grid">
+                <section class="sub-panel">
+                  <div class="section-heading">
+                    <div>
+                      <p class="section-label">발주</p>
+                      <h3>발주 등록</h3>
+                    </div>
+                  </div>
+                  <form id="purchaseForm" class="stack-form">
+                    <label>
+                      품목
+                      <select name="itemId" required></select>
+                    </label>
+                    <label>
+                      수량
+                      <input name="quantity" type="number" min="0.1" step="0.1" required />
+                    </label>
+                    <label>
+                      거래처
+                      <select name="vendorId" required></select>
+                    </label>
+                    <button type="submit" class="primary-button">발주 생성</button>
+                  </form>
+                </section>
+
+                <section class="sub-panel">
+                  <div class="section-heading">
+                    <div>
+                      <p class="section-label">입고</p>
+                      <h3>입고 처리</h3>
+                    </div>
+                  </div>
+                  <form id="receiptForm" class="stack-form">
+                    <label>
+                      발주 건
+                      <select name="purchaseOrderId" required></select>
+                    </label>
+                    <label>
+                      입고 수량
+                      <input name="receivedQuantity" type="number" min="0.1" step="0.1" required />
+                    </label>
+                    <button type="submit" class="primary-button">입고 반영</button>
+                  </form>
+                </section>
+
+                <section class="sub-panel full-span">
+                  <div class="section-heading">
+                    <div>
+                      <p class="section-label">현황</p>
+                      <h3>발주 / 입고 이력</h3>
+                    </div>
+                  </div>
+                  <ul id="purchaseList" class="activity-list"></ul>
+                </section>
+              </div>
+            </section>
+
+            <section class="tab-panel" data-panel="receipt">
+              <div class="sub-grid">
+                <section class="sub-panel">
+                  <div class="section-heading">
+                    <div>
+                      <p class="section-label">영수증</p>
+                      <h3>영수증 업로드 차감</h3>
+                    </div>
+                  </div>
+                  <form id="receiptUploadForm" class="stack-form">
+                    <label>
+                      영수증 이미지
+                      <input name="receiptImage" type="file" accept="image/*" required />
+                    </label>
+                    <label>
+                      사용 일시
+                      <input name="usageDate" type="datetime-local" required />
+                    </label>
+                    <label>
+                      메모
+                      <input name="note" type="text" placeholder="예: 배달앱 주문 영수증 차감" />
+                    </label>
+                    <div id="receiptLineItems" class="line-items"></div>
+                    <button id="addReceiptLineButton" type="button" class="secondary-button">
+                      차감 품목 한 줄 추가
+                    </button>
+                    <button type="submit" class="primary-button">영수증 업로드 후 차감</button>
+                  </form>
+                </section>
+
+                <section class="sub-panel">
+                  <div class="section-heading">
+                    <div>
+                      <p class="section-label">최근</p>
+                      <h3>영수증 차감 이력</h3>
+                    </div>
+                  </div>
+                  <ul id="receiptUploadList" class="activity-list"></ul>
+                  <div class="section-heading compact-heading">
+                    <div>
+                      <p class="section-label">OCR</p>
+                      <h3>영수증 텍스트 미리 분석</h3>
+                    </div>
+                  </div>
+                  <textarea
+                    id="ocrPreviewInput"
+                    class="message-box"
+                    placeholder="영수증 텍스트를 붙여넣으면 등록 품목명과 매칭되는 항목을 미리 찾아줍니다."
+                  ></textarea>
+                  <button id="runOcrPreviewButton" class="secondary-button" type="button">OCR 미리보기 실행</button>
+                  <div id="ocrPreviewResult" class="report-card"></div>
+                </section>
+              </div>
+            </section>
+
+            <section class="tab-panel" data-panel="closing">
+              <div class="sub-grid">
+                <section class="sub-panel">
+                  <div class="section-heading">
+                    <div>
+                      <p class="section-label">마감</p>
+                      <h3>수동 마감 차감</h3>
+                    </div>
+                  </div>
+                  <form id="closingForm" class="form-grid">
+                    <label>
+                      품목
+                      <select name="itemId" required></select>
+                    </label>
+                    <label>
+                      사용량
+                      <input name="usedQuantity" type="number" min="0.1" step="0.1" required />
+                    </label>
+                    <label class="wide-field">
+                      메모
+                      <input name="note" type="text" placeholder="예: 저녁 마감 정산" />
+                    </label>
+                    <button type="submit" class="primary-button">마감 반영</button>
+                  </form>
+                </section>
+
+                <section class="sub-panel">
+                  <div class="section-heading">
+                    <div>
+                      <p class="section-label">리포트</p>
+                      <h3>일자별 마감 리포트</h3>
+                    </div>
+                  </div>
+                  <label>
+                    조회 날짜
+                    <input id="reportDateInput" type="date" />
+                  </label>
+                  <div id="dailyReportCard" class="report-card"></div>
+                </section>
+
+                <section class="sub-panel full-span">
+                  <div class="section-heading">
+                    <div>
+                      <p class="section-label">이력</p>
+                      <h3>최근 차감 이력</h3>
+                    </div>
+                  </div>
+                  <ul id="closingList" class="activity-list"></ul>
+                </section>
+              </div>
+            </section>
+
+            <section class="tab-panel" data-panel="users">
+              <div class="sub-grid">
+                <section class="sub-panel">
+                  <div class="section-heading">
+                    <div>
+                      <p class="section-label">사용자</p>
+                      <h3>매장 사용자 추가</h3>
+                    </div>
+                  </div>
+                  <div id="userAdminNotice" class="selected-category">
+                    관리자만 사용자를 추가할 수 있습니다.
+                  </div>
+                  <form id="userForm" class="form-grid">
+                    <label>
+                      사용자 ID
+                      <input name="username" type="text" placeholder="예: parttimer1" required />
+                    </label>
+                    <label>
+                      표시 이름
+                      <input name="displayName" type="text" placeholder="예: 오후 알바" required />
+                    </label>
+                    <label>
+                      역할
+                      <select name="role" required>
+                        <option value="staff">직원</option>
+                        <option value="manager">관리자</option>
+                      </select>
+                    </label>
+                    <label>
+                      비밀번호
+                      <input name="password" type="password" placeholder="4자리 이상" required />
+                    </label>
+                    <button type="submit" class="primary-button">사용자 추가</button>
+                  </form>
+                </section>
+
+                <section class="sub-panel">
+                  <div class="section-heading">
+                    <div>
+                      <p class="section-label">목록</p>
+                      <h3>등록 사용자</h3>
+                    </div>
+                  </div>
+                  <ul id="userList" class="activity-list"></ul>
+                </section>
+              </div>
+            </section>
+
+            <section class="tab-panel" data-panel="kakao">
+              <div class="sub-grid">
+                <section class="sub-panel">
+                  <div class="section-heading">
+                    <div>
+                      <p class="section-label">카카오</p>
+                      <h3>카카오 발주 알림 설정</h3>
+                    </div>
+                  </div>
+                  <form id="kakaoForm" class="stack-form">
+                    <label>
+                      발신 매장명
+                      <input name="senderName" type="text" placeholder="예: 샵앤샵 평택1호점" />
+                    </label>
+                    <label>
+                      수신 카카오 채널/ID
+                      <input name="channelId" type="text" placeholder="예: 평택식자재 카카오채널" />
+                    </label>
+                    <label>
+                      비고
+                      <input name="notes" type="text" placeholder="실제 자동 발송은 서버 연동 필요" />
+                    </label>
+                    <button type="submit" class="primary-button">설정 저장</button>
+                  </form>
+                </section>
+
+                <section class="sub-panel">
+                  <div class="section-heading">
+                    <div>
+                      <p class="section-label">메시지</p>
+                      <h3>발주 알림 메시지</h3>
+                    </div>
+                  </div>
+                  <textarea id="kakaoMessageOutput" class="message-box" readonly></textarea>
+                  <div class="page-actions">
+                    <button id="copyKakaoMessageButton" class="secondary-button" type="button">메시지 복사</button>
+                    <button id="sendKakaoSimulationButton" class="primary-button" type="button">카카오 전송 시뮬레이션</button>
+                  </div>
+                  <div id="kakaoDispatchStatus" class="report-card"></div>
+                  <p class="helper-text">
+                    현재는 브라우저만으로 동작하는 버전이라 자동 전송 대신 카카오 발송용 메시지를 생성합니다.
+                  </p>
+                </section>
+              </div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <template id="emptyStateTemplate">
+      <li class="empty-state">등록된 내역이 없습니다.</li>
+    </template>
+
+    <script src="workspace.js"></script>
+  </body>
+</html>
