@@ -11,6 +11,7 @@ const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, "data");
 const STORE_PATH = path.join(DATA_DIR, "store.json");
 const DB_PATH = process.env.DB_PATH || path.join(DATA_DIR, "app.db");
+const DATABASE_URL = process.env.DATABASE_URL || "";
 
 const CATEGORY_DEFINITIONS = [
   { id: "pizza-cheese-bbal", name: "피자는치즈빨", description: "피자 브랜드 운영 공간" },
@@ -23,31 +24,38 @@ const CATEGORY_DEFINITIONS = [
 const sessions = new Map();
 let storeDb;
 
-ensureStore();
-configureWebPush();
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
 
-const server = http.createServer(async (req, res) => {
-  try {
-    if (req.url.startsWith("/api/")) {
-      await handleApi(req, res);
-      return;
+async function main() {
+  await ensureStore();
+  await configureWebPush();
+
+  const server = http.createServer(async (req, res) => {
+    try {
+      if (req.url.startsWith("/api/")) {
+        await handleApi(req, res);
+        return;
+      }
+
+      await serveStatic(req, res);
+    } catch (error) {
+      sendJson(res, 500, { error: "server_error", message: error.message });
     }
+  });
 
-    await serveStatic(req, res);
-  } catch (error) {
-    sendJson(res, 500, { error: "server_error", message: error.message });
-  }
-});
-
-server.listen(PORT, HOST, () => {
-  console.log(`Server running on http://${HOST}:${PORT}`);
-});
+  server.listen(PORT, HOST, () => {
+    console.log(`Server running on http://${HOST}:${PORT}`);
+  });
+}
 
 async function handleApi(req, res) {
   const { pathname } = new URL(req.url, `http://${req.headers.host}`);
 
   if (req.method === "GET" && pathname === "/api/bootstrap") {
-    const store = readStore();
+    const store = await readStore();
     return sendJson(res, 200, {
       categories: store.categories.map(toPublicCategory),
       notificationSupported: true,
@@ -57,7 +65,7 @@ async function handleApi(req, res) {
 
   if (req.method === "POST" && pathname === "/api/login") {
     const body = await readJson(req);
-    const store = readStore();
+    const store = await readStore();
     const category = findById(store.categories, body.categoryId);
     if (!category) {
       return sendJson(res, 404, { error: "category_not_found" });
@@ -94,7 +102,7 @@ async function handleApi(req, res) {
 
   if (req.method === "POST" && pathname === "/api/seed") {
     const seeded = createSeedStore();
-    writeStore(seeded);
+    await writeStore(seeded);
     sessions.clear();
     return sendJson(res, 200, {
       ok: true,
@@ -108,7 +116,7 @@ async function handleApi(req, res) {
   }
 
   if (req.method === "GET" && pathname === "/api/workspace") {
-    const store = readStore();
+    const store = await readStore();
     const category = findById(store.categories, session.categoryId);
     const user = category ? findById(category.users, session.userId) : null;
     if (!category || !user) {
@@ -123,7 +131,7 @@ async function handleApi(req, res) {
   }
 
   if (req.method === "GET" && pathname === "/api/users") {
-    const store = readStore();
+    const store = await readStore();
     const category = findById(store.categories, session.categoryId);
     const user = category ? findById(category.users, session.userId) : null;
     if (!category || !user) {
@@ -345,7 +353,7 @@ function requireSession(req, res) {
 
 async function mutateCategory(res, session, updater, formatter) {
   try {
-    const store = readStore();
+    const store = await readStore();
     const category = findById(store.categories, session.categoryId);
     if (!category) {
       return sendJson(res, 404, { error: "category_not_found" });
@@ -354,7 +362,7 @@ async function mutateCategory(res, session, updater, formatter) {
     const previousSignature = computeLowStockSignature(category);
     await updater(category, actingUser, store);
     category.lastLowStockSignature = computeLowStockSignature(category);
-    writeStore(store);
+    await writeStore(store);
     await maybeSendLowStockPush(store, category, previousSignature);
     const payload = formatter ? formatter(category) : { category: sanitizeCategory(category) };
     return sendJson(res, 200, payload.category ? payload : { category: sanitizeCategory(category), ...payload });
@@ -364,22 +372,23 @@ async function mutateCategory(res, session, updater, formatter) {
   }
 }
 
-function ensureStore() {
-  storeDb = createStoreDatabase({
+async function ensureStore() {
+  storeDb = await createStoreDatabase({
     dataDir: DATA_DIR,
     dbPath: DB_PATH,
     legacyStorePath: STORE_PATH,
     initialStoreFactory: createInitialStore,
     migrateStore,
+    databaseUrl: DATABASE_URL,
   });
 }
 
-function readStore() {
+async function readStore() {
   return storeDb.readStore();
 }
 
-function writeStore(store) {
-  storeDb.writeStore(store);
+async function writeStore(store) {
+  await storeDb.writeStore(store);
 }
 
 function createInitialStore() {
@@ -641,8 +650,8 @@ function inferItemsFromReceiptText(category, receiptText) {
     }));
 }
 
-function configureWebPush() {
-  const store = readStore();
+async function configureWebPush() {
+  const store = await readStore();
   webpush.setVapidDetails(
     "mailto:shopnshop@example.com",
     getPublicVapidKey(store),
@@ -695,7 +704,7 @@ async function maybeSendLowStockPush(store, category, previousSignature) {
 
   if (validSubscriptions.length !== category.pushSubscriptions.length) {
     category.pushSubscriptions = validSubscriptions;
-    writeStore(store);
+    await writeStore(store);
   }
 }
 

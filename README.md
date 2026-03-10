@@ -31,15 +31,18 @@ npm start
 
 그 다음 브라우저에서 `http://localhost:3000`으로 접속하면 됩니다.
 
-운영 데이터는 [data/app.db](/home/user/ccounting-system/data/app.db)에 저장됩니다.
-기존 [data/store.json](/home/user/ccounting-system/data/store.json)은 최초 SQLite 마이그레이션용
+운영 데이터는 `DATABASE_URL`이 있으면 외부 Postgres에 저장되고, 없으면 로컬
+[data/app.db](/home/user/ccounting-system/data/app.db)에 저장됩니다.
+
+기존 [data/store.json](/home/user/ccounting-system/data/store.json)은 최초 DB 마이그레이션용
 백업 소스로만 사용됩니다.
 
 환경변수 예시는 [.env.example](/home/user/ccounting-system/.env.example)에 정리했습니다.
 
 - `HOST`: 기본값 `0.0.0.0`
 - `PORT`: 기본값 `3000`
-- `DB_PATH`: SQLite DB 파일 경로
+- `DB_PATH`: 로컬 SQLite DB 파일 경로
+- `DATABASE_URL`: Render free 배포용 외부 Postgres 연결 문자열
 
 브라우저 푸시 알림은 `localhost`에서는 바로 테스트할 수 있고, 외부 배포 환경에서는 보통
 `https`가 필요합니다.
@@ -76,6 +79,7 @@ npm start
 
 ## 배포 메모
 
-- 여러 기기와 외부 IP에서 함께 쓰려면 이 서버를 외부 호스팅에 배포해야 합니다.
+- Render 무료 플랜에서는 `Persistent Disk`를 못 쓰므로 `DATABASE_URL`로 외부 Postgres를 연결해야 합니다.
+- Render 유료 플랜이나 로컬 테스트에서는 SQLite fallback을 계속 쓸 수 있습니다.
 - 브라우저 푸시는 운영 환경에서 보통 `HTTPS`가 필요합니다.
-- 현재 저장소는 `SQLite + Node 서버` 기준으로 배포 가능한 상태입니다.
+- 현재 저장소는 `Postgres 우선 + SQLite fallback` 기준으로 배포 가능한 상태입니다.
