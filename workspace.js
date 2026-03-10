@@ -17,11 +17,13 @@ const state = {
 
 const elements = {
   workspaceBrandTitle: document.querySelector("#workspaceBrandTitle"),
-  workspaceTitle: document.querySelector("#workspaceTitle"),
-  workspaceSubtitle: document.querySelector("#workspaceSubtitle"),
   currentCategoryBadge: document.querySelector("#currentCategoryBadge"),
   currentUserBadge: document.querySelector("#currentUserBadge"),
-  logoutButton: document.querySelector("#logoutButton"),
+  sidebarBrandButton: document.querySelector("#sidebarBrandButton"),
+  sidebarMenuButton: document.querySelector("#sidebarMenuButton"),
+  sidebarMenu: document.querySelector("#sidebarMenu"),
+  sidebarLogoutButton: document.querySelector("#sidebarLogoutButton"),
+  openUsersTabButton: document.querySelector("#openUsersTabButton"),
   exportInventoryButton: document.querySelector("#exportInventoryButton"),
   enableAlertsButton: document.querySelector("#enableAlertsButton"),
   tabs: document.querySelector("#workspaceTabs"),
@@ -73,10 +75,16 @@ bindEvents();
 initialize();
 
 function bindEvents() {
-  elements.logoutButton.addEventListener("click", handleLogout);
+  elements.sidebarBrandButton.addEventListener("click", toggleSidebarMenu);
+  elements.sidebarMenuButton.addEventListener("click", toggleSidebarMenu);
+  elements.sidebarLogoutButton.addEventListener("click", handleLogout);
+  elements.openUsersTabButton.addEventListener("click", openUsersTab);
   elements.exportInventoryButton.addEventListener("click", exportInventoryCsv);
   elements.enableAlertsButton.addEventListener("click", enableAlerts);
   elements.tabs.addEventListener("click", handleTabClick);
+  elements.itemList.addEventListener("click", handleItemListAction);
+  elements.vendorList.addEventListener("click", handleVendorListAction);
+  elements.menuRecipeList.addEventListener("click", handleMenuRecipeListAction);
   elements.itemForm.addEventListener("submit", handleItemSubmit);
   elements.vendorForm.addEventListener("submit", handleVendorSubmit);
   elements.userForm.addEventListener("submit", handleUserSubmit);
@@ -173,8 +181,6 @@ function renderWorkspaceFrame() {
   }
 
   elements.workspaceBrandTitle.textContent = category.name;
-  elements.workspaceTitle.textContent = `${category.name} 재고관리 워크스페이스`;
-  elements.workspaceSubtitle.textContent = `${category.description} 운영 데이터를 이 페이지에서만 관리합니다.`;
   elements.currentCategoryBadge.textContent = `카테고리 ${category.displayOrder}`;
   elements.currentUserBadge.textContent = `${user.displayName} · ${user.role === "manager" ? "관리자" : "직원"}`;
 }
@@ -267,9 +273,15 @@ function renderItemList(category) {
     elements.itemList,
     category.items.map(
       (item) => `
-        <li class="activity-item">
-          <p class="activity-title">${item.name}</p>
-          <p class="activity-meta">현재 ${formatQuantity(item.currentStock)} ${item.unit} / 기준 ${formatQuantity(item.parStock)} ${item.unit}</p>
+        <li class="activity-item activity-row">
+          <div>
+            <p class="activity-title">${item.name}</p>
+            <p class="activity-meta">현재 ${formatQuantity(item.currentStock)} ${item.unit} / 기준 ${formatQuantity(item.parStock)} ${item.unit}</p>
+          </div>
+          <div class="row-actions">
+            <button class="secondary-button compact-button" type="button" data-action="edit-item" data-id="${item.id}">수정</button>
+            <button class="secondary-button compact-button danger-button" type="button" data-action="delete-item" data-id="${item.id}">삭제</button>
+          </div>
         </li>
       `,
     ),
@@ -281,9 +293,15 @@ function renderVendorList(category) {
     elements.vendorList,
     category.vendors.map(
       (vendor) => `
-        <li class="activity-item">
-          <p class="activity-title">${vendor.name}</p>
-          <p class="activity-meta">${vendor.contactPerson} · ${vendor.phone} · 카카오 ${vendor.kakaoId || "미등록"}</p>
+        <li class="activity-item activity-row">
+          <div>
+            <p class="activity-title">${vendor.name}</p>
+            <p class="activity-meta">${vendor.contactPerson} · ${vendor.phone} · 카카오 ${vendor.kakaoId || "미등록"}</p>
+          </div>
+          <div class="row-actions">
+            <button class="secondary-button compact-button" type="button" data-action="edit-vendor" data-id="${vendor.id}">수정</button>
+            <button class="secondary-button compact-button danger-button" type="button" data-action="delete-vendor" data-id="${vendor.id}">삭제</button>
+          </div>
         </li>
       `,
     ),
@@ -403,10 +421,16 @@ function renderMenuRecipeSection(category, user) {
   renderList(
     elements.menuRecipeList,
     (category.menuRecipes || []).map((recipe) => `
-      <li class="activity-item">
-        <p class="activity-title">${recipe.name}</p>
-        <p class="activity-meta">${(recipe.aliases || []).join(", ") || "별칭 없음"}</p>
-        <p class="activity-meta">${recipe.ingredients.map((ingredient) => `${ingredient.itemName} ${formatQuantity(ingredient.quantity)} ${ingredient.unit}`).join(" / ")}</p>
+      <li class="activity-item activity-row">
+        <div>
+          <p class="activity-title">${recipe.name}</p>
+          <p class="activity-meta">${(recipe.aliases || []).join(", ") || "별칭 없음"}</p>
+          <p class="activity-meta">${recipe.ingredients.map((ingredient) => `${ingredient.itemName} ${formatQuantity(ingredient.quantity)} ${ingredient.unit}`).join(" / ")}</p>
+        </div>
+        <div class="row-actions">
+          <button class="secondary-button compact-button" type="button" data-action="edit-recipe" data-id="${recipe.id}">수정</button>
+          <button class="secondary-button compact-button danger-button" type="button" data-action="delete-recipe" data-id="${recipe.id}">삭제</button>
+        </div>
       </li>
     `),
   );
@@ -488,6 +512,7 @@ function handleTabClick(event) {
   }
   state.activeTab = button.dataset.tab;
   persistClientState();
+  closeSidebarMenu();
   syncTabState();
   renderWorkspace();
 }
@@ -539,6 +564,7 @@ async function handleItemSubmit(event) {
   event.preventDefault();
   const formData = new FormData(event.currentTarget);
   await mutateWorkspace("/api/items", {
+    id: String(formData.get("id") || "").trim(),
     name: String(formData.get("name")).trim(),
     unit: String(formData.get("unit")).trim(),
     currentStock: Number(formData.get("currentStock")),
@@ -551,6 +577,7 @@ async function handleVendorSubmit(event) {
   event.preventDefault();
   const formData = new FormData(event.currentTarget);
   await mutateWorkspace("/api/vendors", {
+    id: String(formData.get("id") || "").trim(),
     name: String(formData.get("name")).trim(),
     contactPerson: String(formData.get("contactPerson")).trim(),
     phone: String(formData.get("phone")).trim(),
@@ -668,6 +695,7 @@ async function handleMenuRecipeSubmit(event) {
   }
 
   await mutateWorkspace("/api/menu-recipes", {
+    id: String(formData.get("id") || "").trim(),
     name: String(formData.get("name")).trim(),
     aliases: String(formData.get("aliases")).trim(),
     ingredients,
@@ -755,6 +783,22 @@ function handleWorkspaceError(error, fallbackMessage) {
   window.alert(fallbackMessage);
 }
 
+function toggleSidebarMenu() {
+  elements.sidebarMenu.classList.toggle("hidden");
+}
+
+function closeSidebarMenu() {
+  elements.sidebarMenu.classList.add("hidden");
+}
+
+function openUsersTab() {
+  state.activeTab = "users";
+  persistClientState();
+  closeSidebarMenu();
+  syncTabState();
+  renderWorkspace();
+}
+
 async function enableAlerts() {
   if (!state.workspaceCategory) {
     window.alert("먼저 로그인하고 워크스페이스를 여세요.");
@@ -828,7 +872,7 @@ function addReceiptLineRow() {
   elements.receiptLineItems.appendChild(wrapper);
 }
 
-function addRecipeIngredientRow() {
+function addRecipeIngredientRow(existing = null) {
   const items = state.workspaceCategory?.items || [];
   const wrapper = document.createElement("div");
   wrapper.className = "line-item";
@@ -837,6 +881,10 @@ function addRecipeIngredientRow() {
     <input name="recipeQuantity" type="number" min="0.1" step="0.1" placeholder="레시피 수량" required />
     <button type="button" class="secondary-button">삭제</button>
   `;
+  if (existing) {
+    wrapper.querySelector('[name="recipeItemId"]').value = existing.itemId;
+    wrapper.querySelector('[name="recipeQuantity"]').value = existing.quantity;
+  }
   wrapper.querySelector("button").addEventListener("click", () => wrapper.remove());
   elements.recipeIngredients.appendChild(wrapper);
 }
@@ -872,6 +920,72 @@ function readRecipeIngredients() {
       };
     })
     .filter((row) => row.itemId && row.quantity > 0);
+}
+
+function handleItemListAction(event) {
+  const button = event.target.closest("[data-action]");
+  if (!button) {
+    return;
+  }
+  const item = findById(state.workspaceCategory.items, button.dataset.id);
+  if (!item) {
+    return;
+  }
+  if (button.dataset.action === "edit-item") {
+    elements.itemForm.elements.id.value = item.id;
+    elements.itemForm.elements.name.value = item.name;
+    elements.itemForm.elements.unit.value = item.unit;
+    elements.itemForm.elements.currentStock.value = item.currentStock;
+    elements.itemForm.elements.parStock.value = item.parStock;
+    return;
+  }
+  if (button.dataset.action === "delete-item" && window.confirm("이 품목을 삭제할까요?")) {
+    mutateWorkspace("/api/items/delete", { id: item.id });
+  }
+}
+
+function handleVendorListAction(event) {
+  const button = event.target.closest("[data-action]");
+  if (!button) {
+    return;
+  }
+  const vendor = findById(state.workspaceCategory.vendors, button.dataset.id);
+  if (!vendor) {
+    return;
+  }
+  if (button.dataset.action === "edit-vendor") {
+    elements.vendorForm.elements.id.value = vendor.id;
+    elements.vendorForm.elements.name.value = vendor.name;
+    elements.vendorForm.elements.contactPerson.value = vendor.contactPerson;
+    elements.vendorForm.elements.phone.value = vendor.phone;
+    elements.vendorForm.elements.kakaoId.value = vendor.kakaoId || "";
+    return;
+  }
+  if (button.dataset.action === "delete-vendor" && window.confirm("이 거래처를 삭제할까요?")) {
+    mutateWorkspace("/api/vendors/delete", { id: vendor.id });
+  }
+}
+
+function handleMenuRecipeListAction(event) {
+  const button = event.target.closest("[data-action]");
+  if (!button) {
+    return;
+  }
+  const recipe = findById(state.workspaceCategory.menuRecipes || [], button.dataset.id);
+  if (!recipe) {
+    return;
+  }
+  if (button.dataset.action === "edit-recipe") {
+    elements.menuRecipeForm.elements.id.value = recipe.id;
+    elements.menuRecipeForm.elements.name.value = recipe.name;
+    elements.menuRecipeForm.elements.aliases.value = (recipe.aliases || []).join(", ");
+    elements.recipeIngredients.innerHTML = "";
+    recipe.ingredients.forEach((ingredient) => addRecipeIngredientRow(ingredient));
+    return;
+  }
+  if (button.dataset.action === "delete-recipe" && window.confirm("이 메뉴 레시피를 삭제할까요?")) {
+    mutateWorkspace("/api/menu-recipes/delete", { id: recipe.id });
+  }
 }
 
 function fileToDataUrl(file) {

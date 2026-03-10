@@ -192,6 +192,18 @@ async function handleApi(req, res) {
   if (req.method === "POST" && pathname === "/api/items") {
     const body = await readJson(req);
     return mutateCategory(res, session, (category) => {
+      if (body.id) {
+        const item = findById(category.items, body.id);
+        if (!item) {
+          throw new Error("item_not_found");
+        }
+        item.name = body.name;
+        item.unit = body.unit;
+        item.currentStock = number(body.currentStock);
+        item.parStock = number(body.parStock);
+        return;
+      }
+
       category.items.unshift({
         id: crypto.randomUUID(),
         name: body.name,
@@ -202,9 +214,35 @@ async function handleApi(req, res) {
     });
   }
 
+  if (req.method === "POST" && pathname === "/api/items/delete") {
+    const body = await readJson(req);
+    return mutateCategory(res, session, (category) => {
+      category.items = category.items.filter((item) => item.id !== body.id);
+      category.purchaseOrders = category.purchaseOrders.filter((order) => order.itemId !== body.id);
+      category.receipts = category.receipts.filter((receipt) => receipt.itemId !== body.id);
+      category.closings = category.closings.filter((closing) => closing.itemId !== body.id);
+      category.menuRecipes = (category.menuRecipes || []).map((recipe) => ({
+        ...recipe,
+        ingredients: recipe.ingredients.filter((ingredient) => ingredient.itemId !== body.id),
+      }));
+    });
+  }
+
   if (req.method === "POST" && pathname === "/api/vendors") {
     const body = await readJson(req);
     return mutateCategory(res, session, (category) => {
+      if (body.id) {
+        const vendor = findById(category.vendors, body.id);
+        if (!vendor) {
+          throw new Error("vendor_not_found");
+        }
+        vendor.name = body.name;
+        vendor.contactPerson = body.contactPerson;
+        vendor.phone = body.phone;
+        vendor.kakaoId = body.kakaoId || "";
+        return;
+      }
+
       category.vendors.unshift({
         id: crypto.randomUUID(),
         name: body.name,
@@ -212,6 +250,14 @@ async function handleApi(req, res) {
         phone: body.phone,
         kakaoId: body.kakaoId || "",
       });
+    });
+  }
+
+  if (req.method === "POST" && pathname === "/api/vendors/delete") {
+    const body = await readJson(req);
+    return mutateCategory(res, session, (category) => {
+      category.vendors = category.vendors.filter((vendor) => vendor.id !== body.id);
+      category.purchaseOrders = category.purchaseOrders.filter((order) => order.vendorId !== body.id);
     });
   }
 
@@ -230,6 +276,14 @@ async function handleApi(req, res) {
       } else {
         category.menuRecipes.unshift(recipe);
       }
+    });
+  }
+
+  if (req.method === "POST" && pathname === "/api/menu-recipes/delete") {
+    const body = await readJson(req);
+    return mutateCategory(res, session, (category, user) => {
+      requireRole(user, "manager");
+      category.menuRecipes = (category.menuRecipes || []).filter((recipe) => recipe.id !== body.id);
     });
   }
 

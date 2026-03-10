@@ -15,37 +15,36 @@
   <body>
     <div class="page-shell workspace-shell">
       <header class="topbar workspace-topbar">
-        <a class="brand-lockup" href="/">
-          <span class="brand-mark">S</span>
-          <span>
-            <strong id="workspaceBrandTitle">샵앤샵 평택1호점</strong>
-            <small>Workspace</small>
-          </span>
-        </a>
         <div class="page-actions">
           <a class="secondary-button button-link" href="/">메인</a>
           <button id="exportInventoryButton" class="secondary-button" type="button">재고 CSV</button>
           <button id="enableAlertsButton" class="secondary-button" type="button">브라우저 알림</button>
-          <button id="logoutButton" class="primary-button" type="button">로그아웃</button>
         </div>
       </header>
 
       <main class="page-stack">
-        <section class="workspace-hero surface-card">
-          <div>
-            <p class="eyebrow">Workspace</p>
-            <h1 id="workspaceTitle">매장 재고 관리</h1>
-            <p id="workspaceSubtitle" class="hero-copy">카테고리별 재고를 한 화면에서 정리합니다.</p>
-          </div>
-          <div class="workspace-hero-meta">
-            <span id="currentCategoryBadge" class="stat-chip"></span>
-            <span id="currentUserBadge" class="stat-chip"></span>
-          </div>
-        </section>
-
         <section class="workspace-layout">
           <aside class="workspace-sidebar surface-card">
-            <p class="section-label">Menu</p>
+            <div class="sidebar-header">
+              <button id="sidebarBrandButton" class="brand-lockup brand-button" type="button">
+                <span class="brand-mark">S</span>
+                <span>
+                  <strong id="workspaceBrandTitle">샵앤샵 평택1호점</strong>
+                  <small id="currentUserBadge">Workspace</small>
+                </span>
+              </button>
+              <div class="sidebar-menu-wrap">
+                <button id="sidebarMenuButton" class="secondary-button compact-button" type="button">≡</button>
+                <div id="sidebarMenu" class="sidebar-menu hidden">
+                  <button id="sidebarLogoutButton" type="button">로그아웃</button>
+                  <a href="/">매장변경</a>
+                  <button id="openUsersTabButton" type="button">정보변경</button>
+                </div>
+              </div>
+            </div>
+            <div class="sidebar-status">
+              <span id="currentCategoryBadge" class="stat-chip"></span>
+            </div>
             <nav id="workspaceTabs" class="sidebar-nav">
               <button class="tab-button active" data-tab="overview" type="button">개요</button>
               <button class="tab-button" data-tab="items" type="button">재고</button>
@@ -107,6 +106,7 @@
                     </div>
                   </div>
                   <form id="itemForm" class="form-grid">
+                    <input name="id" type="hidden" />
                     <label>
                       품목명
                       <input name="name" type="text" placeholder="예: 양파" required />
@@ -123,11 +123,11 @@
                       기준 재고
                       <input name="parStock" type="number" min="0" step="0.1" required />
                     </label>
-                    <button type="submit" class="primary-button">품목 추가</button>
+                    <button type="submit" class="primary-button">품목 저장</button>
                   </form>
                 </section>
 
-                <section class="sub-panel">
+                <section class="sub-panel full-span">
                   <div class="section-heading">
                     <div>
                       <p class="section-label">현황</p>
@@ -149,6 +149,7 @@
                     </div>
                   </div>
                   <form id="vendorForm" class="form-grid">
+                    <input name="id" type="hidden" />
                     <label>
                       거래처명
                       <input name="name" type="text" placeholder="예: 평택식자재" required />
@@ -165,11 +166,11 @@
                       카카오 ID/채널
                       <input name="kakaoId" type="text" placeholder="예: pytaek-food" />
                     </label>
-                    <button type="submit" class="primary-button">거래처 추가</button>
+                    <button type="submit" class="primary-button">거래처 저장</button>
                   </form>
                 </section>
 
-                <section class="sub-panel">
+                <section class="sub-panel full-span">
                   <div class="section-heading">
                     <div>
                       <p class="section-label">목록</p>
@@ -249,6 +250,7 @@
                     </div>
                   </div>
                   <form id="menuRecipeForm" class="stack-form">
+                    <input name="id" type="hidden" />
                     <label>
                       판매 메뉴명
                       <input name="name" type="text" placeholder="예: 충성콤비네이션M" required />
@@ -265,7 +267,7 @@
                   </form>
                 </section>
 
-                <section class="sub-panel">
+                <section class="sub-panel full-span">
                   <div class="section-heading">
                     <div>
                       <p class="section-label">목록</p>
