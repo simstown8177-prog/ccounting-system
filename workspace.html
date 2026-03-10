@@ -42,19 +42,23 @@
           </div>
         </section>
 
-        <section class="surface-card">
-          <nav id="workspaceTabs" class="tab-strip">
-            <button class="tab-button active" data-tab="overview" type="button">개요</button>
-            <button class="tab-button" data-tab="items" type="button">재고</button>
-            <button class="tab-button" data-tab="vendors" type="button">거래처</button>
-            <button class="tab-button" data-tab="orders" type="button">발주/입고</button>
-            <button class="tab-button" data-tab="receipt" type="button">영수증 차감</button>
-            <button class="tab-button" data-tab="closing" type="button">마감 리포트</button>
-            <button class="tab-button" data-tab="users" type="button">사용자</button>
-            <button class="tab-button" data-tab="kakao" type="button">카카오 알림</button>
-          </nav>
+        <section class="workspace-layout">
+          <aside class="workspace-sidebar surface-card">
+            <p class="section-label">Menu</p>
+            <nav id="workspaceTabs" class="sidebar-nav">
+              <button class="tab-button active" data-tab="overview" type="button">개요</button>
+              <button class="tab-button" data-tab="items" type="button">재고</button>
+              <button class="tab-button" data-tab="vendors" type="button">거래처</button>
+              <button class="tab-button" data-tab="orders" type="button">발주/입고</button>
+              <button class="tab-button" data-tab="receipt" type="button">영수증 차감</button>
+              <button class="tab-button" data-tab="closing" type="button">마감 리포트</button>
+              <button class="tab-button" data-tab="users" type="button">사용자</button>
+              <button class="tab-button" data-tab="kakao" type="button">카카오 알림</button>
+            </nav>
+          </aside>
 
-          <div class="workspace-body">
+          <div class="workspace-content surface-card">
+            <div class="workspace-body">
             <section class="tab-panel active" data-panel="overview">
               <div id="workspaceAlert" class="critical-alert hidden"></div>
               <div class="summary-grid">
@@ -433,6 +437,7 @@
                 </section>
               </div>
             </section>
+            </div>
           </div>
         </section>
       </main>
