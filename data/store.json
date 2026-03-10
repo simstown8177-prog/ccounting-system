@@ -1,0 +1,343 @@
+{
+  "categories": [
+    {
+      "id": "pizza-cheese-bbal",
+      "name": "피자는치즈빨",
+      "description": "피자 브랜드 운영 공간",
+      "displayOrder": 1,
+      "users": [
+        {
+          "id": "28dafbc1-d09e-42df-a47a-518b56e86330",
+          "username": "parttimer1",
+          "displayName": "오후 알바",
+          "role": "staff",
+          "passwordHash": "8361e56f6fd74a64cbf51061947a2bd3f168ef3f0c56c565b496d3bc2c4134f276902dd7ed5f0517d61dfa537983fd0b8dac4c64a5dd37217d11e8848d6d6003",
+          "passwordSalt": "f53a08f4ae2e4c20f2def065e308ea18"
+        },
+        {
+          "id": "df23af49-fe81-43e2-a949-a3f08b9e8cc0",
+          "username": "manager",
+          "displayName": "피자는치즈빨 관리자",
+          "role": "manager",
+          "passwordHash": "acb0d12c53255876fb9a9c8e8d4b23f8d200a55f11256b9f5662f69b26a89c18d2d92f6019c570d645c594272bc52372eb3630270d2481e9cf83779dfaf54a2d",
+          "passwordSalt": "baf051a9e0044d30127e1118e311af08"
+        },
+        {
+          "id": "48eb3d99-9781-41c8-9f2d-74a0e215da8e",
+          "username": "staff",
+          "displayName": "피자는치즈빨 직원",
+          "role": "staff",
+          "passwordHash": "f3040bb31da9002778251823104bcea7b8e2b53cd9ab9943b629740595a099717e673fbfc044ed8b45de6b320fafec19a9f0017e2638bef58eda44448821bb68",
+          "passwordSalt": "2d193d092ffd37e98c08477181175c71"
+        }
+      ],
+      "vendors": [
+        {
+          "id": "3dca83a6-e37b-4471-b5d0-7b361f0d2949",
+          "name": "평택유제품",
+          "contactPerson": "김대리",
+          "phone": "010-2222-1111",
+          "kakaoId": "pt-cheese"
+        },
+        {
+          "id": "6dc94c2a-3227-4f8e-bae7-f34cbcf76858",
+          "name": "도우베이스",
+          "contactPerson": "이과장",
+          "phone": "010-3333-2222",
+          "kakaoId": "dough-center"
+        }
+      ],
+      "items": [
+        {
+          "id": "c78e95c5-6d2a-42a4-9c12-c33643bea1bd",
+          "name": "모짜렐라치즈",
+          "unit": "kg",
+          "currentStock": 1,
+          "parStock": 8
+        },
+        {
+          "id": "19036a90-7485-4c79-a718-629829137dde",
+          "name": "도우",
+          "unit": "개",
+          "currentStock": 12,
+          "parStock": 10
+        },
+        {
+          "id": "0d2d3f13-cfbd-4e7f-b7f4-95f736c394c2",
+          "name": "토마토소스",
+          "unit": "통",
+          "currentStock": 1,
+          "parStock": 3
+        }
+      ],
+      "purchaseOrders": [
+        {
+          "id": "e0391b7f-33e6-433f-a4d1-4b68b8c6e199",
+          "itemId": "c78e95c5-6d2a-42a4-9c12-c33643bea1bd",
+          "vendorId": "3dca83a6-e37b-4471-b5d0-7b361f0d2949",
+          "quantity": 10,
+          "status": "ordered",
+          "createdAt": "2026-03-10T04:21:23.109Z",
+          "receivedQuantity": 0,
+          "receivedAt": null
+        }
+      ],
+      "receipts": [],
+      "closings": [
+        {
+          "id": "2db28bf3-acf8-41b2-b9ac-7c57a95c3e2b",
+          "itemId": "c78e95c5-6d2a-42a4-9c12-c33643bea1bd",
+          "usedQuantity": 2,
+          "note": "주문 영수증 일괄 차감",
+          "sourceLabel": "영수증 업로드",
+          "createdAt": "2026-03-10T04:21:23.109Z"
+        }
+      ],
+      "receiptUploads": [],
+      "kakaoConfig": {
+        "senderName": "샵앤샵 평택1호점",
+        "channelId": "",
+        "notes": ""
+      },
+      "lastOcrPreview": {
+        "requestedAt": "2026-03-10T04:31:01.070Z",
+        "matchedItems": [
+          {
+            "itemId": "c78e95c5-6d2a-42a4-9c12-c33643bea1bd",
+            "name": "모짜렐라치즈",
+            "suggestedQuantity": 1
+          },
+          {
+            "itemId": "19036a90-7485-4c79-a718-629829137dde",
+            "name": "도우",
+            "suggestedQuantity": 1
+          },
+          {
+            "itemId": "0d2d3f13-cfbd-4e7f-b7f4-95f736c394c2",
+            "name": "토마토소스",
+            "suggestedQuantity": 1
+          }
+        ]
+      },
+      "lastKakaoDispatch": {
+        "requestedAt": "2026-03-10T04:31:00.534Z",
+        "requestedBy": "피자는치즈빨 관리자",
+        "messagePreview": "[발주 알림] 테스트",
+        "mode": "simulation_only"
+      },
+      "pushSubscriptions": [],
+      "lastLowStockSignature": "0d2d3f13-cfbd-4e7f-b7f4-95f736c394c2:1|c78e95c5-6d2a-42a4-9c12-c33643bea1bd:1"
+    },
+    {
+      "id": "gogiji",
+      "name": "고기지",
+      "description": "육류 중심 브랜드 운영 공간",
+      "displayOrder": 2,
+      "users": [
+        {
+          "id": "04479a31-8004-4889-abad-52eff13a4707",
+          "username": "manager",
+          "displayName": "고기지 관리자",
+          "role": "manager",
+          "passwordHash": "3c8d039f2e40546e4ceaeaf6195965c3574bfdc9ad8e74069e2ea3e1c094c4d3a1d178267ec947a47278c406ed8b23019be9395255d2992fe30c28c9b4955e3f",
+          "passwordSalt": "e1ea00038db263c78cfbedf348f7f6b2"
+        },
+        {
+          "id": "9e38606f-8f60-49e5-8af9-91a4993bd63c",
+          "username": "staff",
+          "displayName": "고기지 직원",
+          "role": "staff",
+          "passwordHash": "e29c0a4eb417efcbfb6f8408bd3213dd90e85a5da0d9ed729daf1275572be0b0cb19c11fff9fa065cd00d48fee9af59c9edfd9b86a772dfcf8d2a25a63e6fa9d",
+          "passwordSalt": "7954d1c89c7e8c787131c3a7543935d9"
+        }
+      ],
+      "vendors": [
+        {
+          "id": "9aabbd9b-7adc-4d1a-b959-d8e63c8c35b7",
+          "name": "평택정육",
+          "contactPerson": "박실장",
+          "phone": "010-4444-3333",
+          "kakaoId": "pt-meat"
+        },
+        {
+          "id": "ef877bbb-59fc-41fc-b433-81d27e203df9",
+          "name": "채소나라",
+          "contactPerson": "정주임",
+          "phone": "010-5555-4444",
+          "kakaoId": "vege-land"
+        }
+      ],
+      "items": [
+        {
+          "id": "429c9d2f-8990-40ec-a094-6a340248116c",
+          "name": "삼겹살",
+          "unit": "kg",
+          "currentStock": 14,
+          "parStock": 12
+        },
+        {
+          "id": "e661dc66-5bca-488e-afda-50ae6af9cb2d",
+          "name": "상추",
+          "unit": "box",
+          "currentStock": 0,
+          "parStock": 2
+        },
+        {
+          "id": "5edbf42a-18b8-402f-a197-7b9e1c366c35",
+          "name": "참기름",
+          "unit": "병",
+          "currentStock": 2,
+          "parStock": 3
+        }
+      ],
+      "purchaseOrders": [
+        {
+          "id": "d55b99fe-a51b-4139-9a81-a9ffcd03c23b",
+          "itemId": "e661dc66-5bca-488e-afda-50ae6af9cb2d",
+          "vendorId": "ef877bbb-59fc-41fc-b433-81d27e203df9",
+          "quantity": 3,
+          "status": "received",
+          "createdAt": "2026-03-10T04:21:23.109Z",
+          "receivedQuantity": 2,
+          "receivedAt": "2026-03-10T04:21:23.109Z"
+        }
+      ],
+      "receipts": [],
+      "closings": [
+        {
+          "id": "fc56c2dc-a806-404a-8bdd-3465ee45598b",
+          "itemId": "e661dc66-5bca-488e-afda-50ae6af9cb2d",
+          "usedQuantity": 1,
+          "note": "점심 영업 마감",
+          "sourceLabel": "수동 마감",
+          "createdAt": "2026-03-10T04:21:23.109Z"
+        }
+      ],
+      "receiptUploads": [],
+      "kakaoConfig": {
+        "senderName": "샵앤샵 평택1호점",
+        "channelId": "",
+        "notes": ""
+      },
+      "pushSubscriptions": [],
+      "lastLowStockSignature": ""
+    },
+    {
+      "id": "future-space-1",
+      "name": "추 후 예정",
+      "description": "추가 입점 예정 공간 1",
+      "displayOrder": 3,
+      "users": [
+        {
+          "id": "d1e7ecda-4411-482f-80c3-5f07cbf382db",
+          "username": "manager",
+          "displayName": "추 후 예정 관리자",
+          "role": "manager",
+          "passwordHash": "70b15333f1a050b0ddd68575bd11cb994d2d7b11fc59701e014f9a0971220d5e8adb60aa1b80d9ca2203dd2983e408aa754d85bcebcaf4168002a1088ee467b4",
+          "passwordSalt": "ea511f282c07f5ae5716c20726d8430f"
+        },
+        {
+          "id": "e9fb31dc-b238-40ed-a40a-3dd656a4ba77",
+          "username": "staff",
+          "displayName": "추 후 예정 직원",
+          "role": "staff",
+          "passwordHash": "6f62446939f86809d66ce8925e2823b4acf538dc502d227851cacfdd7d6b3abe19031b96f006461a0d04ee996bfb6747d89bb0a53e8d1090694196f4f0e96be6",
+          "passwordSalt": "4952413ff08dabd315baf8860298a79d"
+        }
+      ],
+      "vendors": [],
+      "items": [],
+      "purchaseOrders": [],
+      "receipts": [],
+      "closings": [],
+      "receiptUploads": [],
+      "kakaoConfig": {
+        "senderName": "샵앤샵 평택1호점",
+        "channelId": "",
+        "notes": ""
+      },
+      "pushSubscriptions": [],
+      "lastLowStockSignature": ""
+    },
+    {
+      "id": "future-space-2",
+      "name": "추후 예 정",
+      "description": "추가 입점 예정 공간 2",
+      "displayOrder": 4,
+      "users": [
+        {
+          "id": "9ed298b9-eaed-4aac-92f2-32d206b45019",
+          "username": "manager",
+          "displayName": "추후 예 정 관리자",
+          "role": "manager",
+          "passwordHash": "a18fb68f49f937e91d9f4de3a12503243c67a25092de4097184e7963fc900785228254f3012a716890f5cc6d8adacbb54844a3e281cb56e590f6388ef97518a5",
+          "passwordSalt": "15427531eda28a001ba6d9125383f94f"
+        },
+        {
+          "id": "8eff6cb3-8f84-4231-8110-f16478b5156b",
+          "username": "staff",
+          "displayName": "추후 예 정 직원",
+          "role": "staff",
+          "passwordHash": "0af788e15bbe86e6e21cfe1bd520f36ef5905f6a6056273ca2dcbd8c971fae8cdf3ea9ea0612d0a6dd3ebdb6eb54bf55d33930e8c2d0d0668f97369fd18049bd",
+          "passwordSalt": "5ecc7ac67603d1ceeb6d31e50602e21f"
+        }
+      ],
+      "vendors": [],
+      "items": [],
+      "purchaseOrders": [],
+      "receipts": [],
+      "closings": [],
+      "receiptUploads": [],
+      "kakaoConfig": {
+        "senderName": "샵앤샵 평택1호점",
+        "channelId": "",
+        "notes": ""
+      },
+      "pushSubscriptions": [],
+      "lastLowStockSignature": ""
+    },
+    {
+      "id": "future-space-3",
+      "name": "추 후 예정",
+      "description": "추가 입점 예정 공간 3",
+      "displayOrder": 5,
+      "users": [
+        {
+          "id": "75ad024d-0181-4f2a-b85c-33cdcd8c7dcd",
+          "username": "manager",
+          "displayName": "추 후 예정 관리자",
+          "role": "manager",
+          "passwordHash": "9ced77ff7a979d71549fb714245b43a1001d9e43850cce887d919b1aa59fc005d69e6014736ff00d99e4c337fa58581554960645d34d9b1d27773e24abc422dc",
+          "passwordSalt": "497b37a0ad6b21336c396b416269a1e5"
+        },
+        {
+          "id": "95e887e7-fcf0-43a1-8b6f-6be687c9ea6c",
+          "username": "staff",
+          "displayName": "추 후 예정 직원",
+          "role": "staff",
+          "passwordHash": "e5d8f2739d868f0cf286002e84e60a755858f7a361ba00519b1084e24da143e3f76c91dc42443a3b147561f7ed2f115403bcc2feb8c8412fd7650db11a78753f",
+          "passwordSalt": "804c4b60e2b6ffca0ddca7ac7df07918"
+        }
+      ],
+      "vendors": [],
+      "items": [],
+      "purchaseOrders": [],
+      "receipts": [],
+      "closings": [],
+      "receiptUploads": [],
+      "kakaoConfig": {
+        "senderName": "샵앤샵 평택1호점",
+        "channelId": "",
+        "notes": ""
+      },
+      "pushSubscriptions": [],
+      "lastLowStockSignature": ""
+    }
+  ],
+  "config": {
+    "vapidKeys": {
+      "publicKey": "BILdOmNRGw9B1VkD8nqRU8NAwU8-2kgKnk5QC8obAAm3NWE-8GG-uoIVhmaUlaROEULpbA30nQv-cCLwiWDv7qg",
+      "privateKey": "GWTTSIkjWr3-SxhSG_VCmY-xfxMTUbj8y64SPTP2hiE"
+    }
+  }
+}

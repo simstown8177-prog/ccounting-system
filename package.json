@@ -1,0 +1,12 @@
+{
+  "name": "shop-n-shop-pyeongtaek",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.6.2",
+    "web-push": "^3.6.7"
+  }
+}
