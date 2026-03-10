@@ -347,9 +347,13 @@
                       현재 버전은 업로드한 영수증 이미지에서 직접 문자를 읽지는 않습니다. OCR 결과 텍스트를 함께 넣으면 메뉴/레시피 기준으로 자동 차감 후보를 계산합니다.
                     </p>
                     <div class="page-actions">
+                      <button id="extractReceiptTextButton" class="secondary-button" type="button">이미지에서 텍스트 추출</button>
                       <button id="runOcrPreviewButton" class="secondary-button" type="button">자동 차감 검토</button>
                       <button id="confirmOcrDeductionButton" class="primary-button" type="button">자동 차감 확정</button>
                     </div>
+                    <p class="helper-text">
+                      이미지 파일은 브라우저에서 바로 OCR을 시도합니다. PDF는 현재 자동 인식 대상이 아니므로 OCR 결과 텍스트를 직접 붙여넣어야 합니다.
+                    </p>
                   </form>
                 </section>
 
@@ -475,6 +479,7 @@
       <li class="empty-state">등록된 내역이 없습니다.</li>
     </template>
 
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="workspace.js"></script>
   </body>
 </html>

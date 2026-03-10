@@ -45,6 +45,7 @@ const elements = {
   receiptUploadForm: document.querySelector("#receiptUploadForm"),
   resetRecipeFormButton: document.querySelector("#resetRecipeFormButton"),
   menuRecipeForm: document.querySelector("#menuRecipeForm"),
+  extractReceiptTextButton: document.querySelector("#extractReceiptTextButton"),
   ocrPreviewInput: document.querySelector("#ocrPreviewInput"),
   runOcrPreviewButton: document.querySelector("#runOcrPreviewButton"),
   confirmOcrDeductionButton: document.querySelector("#confirmOcrDeductionButton"),
@@ -93,6 +94,7 @@ function bindEvents() {
   elements.receiptUploadForm.addEventListener("submit", suppressSubmit);
   elements.resetRecipeFormButton.addEventListener("click", resetRecipeForm);
   elements.menuRecipeForm.addEventListener("submit", handleMenuRecipeSubmit);
+  elements.extractReceiptTextButton.addEventListener("click", handleReceiptTextExtraction);
   elements.runOcrPreviewButton.addEventListener("click", handleOcrPreview);
   elements.confirmOcrDeductionButton.addEventListener("click", handleOcrDeductionConfirm);
   elements.addRecipeIngredientButton.addEventListener("click", addRecipeIngredientRow);
@@ -700,6 +702,67 @@ async function handleOcrPreview() {
   }
 }
 
+async function handleReceiptTextExtraction() {
+  const formData = new FormData(elements.receiptUploadForm);
+  const files = formData.getAll("receiptImage").filter((file) => file && file.size > 0);
+  if (!files.length) {
+    window.alert("영수증 파일을 한 개 이상 선택하세요.");
+    return;
+  }
+
+  if (!window.Tesseract) {
+    window.alert("OCR 엔진을 불러오지 못했습니다. 잠시 후 다시 시도하세요.");
+    return;
+  }
+
+  const imageFiles = files.filter((file) => file.type.startsWith("image/"));
+  const skippedFiles = files.filter((file) => !file.type.startsWith("image/"));
+
+  if (!imageFiles.length) {
+    window.alert("현재 자동 OCR은 이미지 파일만 지원합니다. PDF는 OCR 텍스트를 직접 붙여넣어 주세요.");
+    return;
+  }
+
+  setReceiptExtractionState(true, `OCR 준비 중... (${imageFiles.length}개 이미지)`);
+  const extractedBlocks = [];
+
+  try {
+    for (let index = 0; index < imageFiles.length; index += 1) {
+      const file = imageFiles[index];
+      setReceiptExtractionState(true, `${file.name} 인식 중... (${index + 1}/${imageFiles.length})`);
+      const text = await recognizeReceiptFile(file, index + 1, imageFiles.length);
+      if (text) {
+        extractedBlocks.push(text);
+      }
+    }
+
+    if (!extractedBlocks.length) {
+      throw new Error("ocr_empty_result");
+    }
+
+    elements.ocrPreviewInput.value = extractedBlocks.join("\n");
+    const skippedNotice = skippedFiles.length
+      ? `<div class="summary-line">자동 OCR 제외: ${skippedFiles.map((file) => file.name).join(", ")}</div>`
+      : "";
+    elements.ocrPreviewResult.innerHTML = `
+      <div class="preview-block">
+        <strong>텍스트 추출 완료</strong>
+        <div class="summary-line">이미지 ${imageFiles.length}건에서 OCR 텍스트를 추출했습니다.</div>
+        ${skippedNotice}
+      </div>
+    `;
+
+    await handleOcrPreview();
+  } catch (error) {
+    const message = error.message === "ocr_empty_result"
+      ? "이미지에서 읽어낸 텍스트가 없습니다. 사진 선명도나 영수증 방향을 확인하세요."
+      : "영수증 OCR 처리 중 오류가 발생했습니다.";
+    handleWorkspaceError(error, message);
+  } finally {
+    setReceiptExtractionState(false);
+  }
+}
+
 async function handleOcrDeductionConfirm() {
   if (!state.workspaceCategory?.lastReceiptPreview) {
     window.alert("먼저 자동 차감 검토를 실행하세요.");
@@ -713,6 +776,23 @@ async function handleOcrDeductionConfirm() {
   } catch (error) {
     handleWorkspaceError(error, "자동 차감 확정 중 오류가 발생했습니다.");
   }
+}
+
+async function recognizeReceiptFile(file, index, total) {
+  const result = await window.Tesseract.recognize(file, "kor+eng", {
+    logger: (message) => {
+      if (message.status === "recognizing text") {
+        const progress = Math.round((message.progress || 0) * 100);
+        setReceiptExtractionState(true, `${file.name} 인식 중... (${index}/${total}) ${progress}%`);
+      }
+    },
+  });
+
+  return String(result.data?.text || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join("\n");
 }
 
 async function mutateWorkspace(url, payload) {
@@ -744,6 +824,7 @@ function handleWorkspaceError(error, fallbackMessage) {
     recipe_ingredient_item_not_found: "레시피 재료 품목이 유효하지 않습니다. 품목을 다시 선택하세요.",
     preview_required: "자동 차감 검토 결과가 없습니다. OCR 텍스트를 다시 검토하세요.",
     receipt_files_required: "영수증 파일을 한 개 이상 선택하세요.",
+    ocr_empty_result: "영수증 이미지에서 읽어낸 텍스트가 없습니다.",
   };
 
   window.alert(messageMap[error.message] || fallbackMessage);
@@ -833,6 +914,15 @@ function updateSidebarAlertsButton() {
     elements.sidebarAlertsButton.textContent = "브라우저 알림";
   }
   elements.sidebarAlertsButton.disabled = Boolean(pushSubscribed);
+}
+
+function setReceiptExtractionState(isProcessing, message = "") {
+  elements.extractReceiptTextButton.disabled = isProcessing;
+  elements.runOcrPreviewButton.disabled = isProcessing;
+  elements.confirmOcrDeductionButton.disabled = isProcessing || !state.workspaceCategory?.lastReceiptPreview?.matchedMenus?.length;
+  if (isProcessing) {
+    elements.ocrPreviewResult.innerHTML = `<div class="summary-line">${message}</div>`;
+  }
 }
 
 function addRecipeIngredientRow(existing = null) {
