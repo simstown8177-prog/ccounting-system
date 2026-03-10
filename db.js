@@ -2,6 +2,31 @@ const fs = require("fs");
 const Database = require("better-sqlite3");
 const { Pool } = require("pg");
 
+function normalizeIpFamily(value) {
+  if (value === 4 || value === "4") {
+    return 4;
+  }
+
+  if (value === 6 || value === "6") {
+    return 6;
+  }
+
+  return undefined;
+}
+
+function buildPostgresPoolOptions(databaseUrl) {
+  const ipFamily = normalizeIpFamily(process.env.DATABASE_IP_FAMILY)
+    || (process.env.RENDER ? 4 : undefined);
+  const sslEnabled = databaseUrl.includes("sslmode=require") || databaseUrl.includes("render.com");
+  const sslRejectUnauthorized = process.env.DATABASE_SSL_REJECT_UNAUTHORIZED === "true";
+
+  return {
+    connectionString: databaseUrl,
+    ssl: sslEnabled ? { rejectUnauthorized: sslRejectUnauthorized } : undefined,
+    family: ipFamily,
+  };
+}
+
 async function createStoreDatabase({
   dataDir,
   dbPath,
@@ -137,12 +162,7 @@ async function createPostgresStore({
   migrateStore,
   databaseUrl,
 }) {
-  const pool = new Pool({
-    connectionString: databaseUrl,
-    ssl: databaseUrl.includes("sslmode=require") || databaseUrl.includes("render.com")
-      ? { rejectUnauthorized: false }
-      : undefined,
-  });
+  const pool = new Pool(buildPostgresPoolOptions(databaseUrl));
 
   const api = {
     async initialize() {
