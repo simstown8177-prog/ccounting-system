@@ -451,6 +451,36 @@ h3 {
   padding: 18px 22px 28px;
 }
 
+.workspace-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 0 0 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+.workspace-toolbar-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.workspace-toolbar-copy small {
+  color: var(--muted);
+}
+
+.workspace-toolbar-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.workspace-toolbar-actions input,
+.workspace-toolbar-actions select {
+  min-width: 160px;
+}
+
 .workspace-content .surface-card,
 .workspace-content .sub-panel,
 .workspace-content .metric-card,
@@ -579,9 +609,14 @@ tbody tr.low-stock {
 
 .activity-item,
 .empty-state {
-  padding: 16px 18px;
-  border: 1px solid var(--border);
-  background: #fff;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+}
+
+.activity-list .empty-state {
+  padding: 14px 0;
+  border-bottom: 0;
 }
 
 .activity-row {
@@ -605,6 +640,10 @@ tbody tr.low-stock {
 
 .danger-button {
   color: var(--danger);
+}
+
+.activity-list {
+  gap: 0;
 }
 
 .activity-title {
@@ -819,6 +858,17 @@ tbody tr.low-stock {
   .workspace-content {
     padding: 12px;
     border-left: 0;
+  }
+
+  .workspace-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .workspace-toolbar-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
 
   .workspace-body,

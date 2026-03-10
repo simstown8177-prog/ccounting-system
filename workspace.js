@@ -13,6 +13,8 @@ const state = {
   currentUser: null,
   lastAlarmSignatureByCategory: clientState.lastAlarmSignatureByCategory || {},
   serviceWorkerRegistration: null,
+  inventorySearch: "",
+  inventoryStatusFilter: "all",
 };
 
 const elements = {
@@ -26,6 +28,8 @@ const elements = {
   openUsersTabButton: document.querySelector("#openUsersTabButton"),
   exportInventoryButton: document.querySelector("#exportInventoryButton"),
   enableAlertsButton: document.querySelector("#enableAlertsButton"),
+  inventorySearchInput: document.querySelector("#inventorySearchInput"),
+  inventoryStatusFilter: document.querySelector("#inventoryStatusFilter"),
   tabs: document.querySelector("#workspaceTabs"),
   workspaceAlert: document.querySelector("#workspaceAlert"),
   metricItems: document.querySelector("#metricItems"),
@@ -81,6 +85,8 @@ function bindEvents() {
   elements.openUsersTabButton.addEventListener("click", openUsersTab);
   elements.exportInventoryButton.addEventListener("click", exportInventoryCsv);
   elements.enableAlertsButton.addEventListener("click", enableAlerts);
+  elements.inventorySearchInput.addEventListener("input", handleInventorySearch);
+  elements.inventoryStatusFilter.addEventListener("change", handleInventoryFilterChange);
   elements.tabs.addEventListener("click", handleTabClick);
   elements.itemList.addEventListener("click", handleItemListAction);
   elements.vendorList.addEventListener("click", handleVendorListAction);
@@ -243,8 +249,9 @@ function renderWorkspaceStats(category) {
 }
 
 function renderInventoryTable(category) {
-  elements.inventoryTableBody.innerHTML = category.items.length
-    ? category.items
+  const items = getVisibleItems(category);
+  elements.inventoryTableBody.innerHTML = items.length
+    ? items
         .map((item) => {
           const shortage = roundNumber(Math.max(0, item.parStock - item.currentStock));
           const status =
@@ -269,9 +276,10 @@ function renderInventoryTable(category) {
 }
 
 function renderItemList(category) {
+  const items = getVisibleItems(category);
   renderList(
     elements.itemList,
-    category.items.map(
+    items.map(
       (item) => `
         <li class="activity-item activity-row">
           <div>
@@ -783,6 +791,16 @@ function handleWorkspaceError(error, fallbackMessage) {
   window.alert(fallbackMessage);
 }
 
+function handleInventorySearch(event) {
+  state.inventorySearch = event.target.value.trim().toLowerCase();
+  renderWorkspace();
+}
+
+function handleInventoryFilterChange(event) {
+  state.inventoryStatusFilter = event.target.value;
+  renderWorkspace();
+}
+
 function toggleSidebarMenu() {
   elements.sidebarMenu.classList.toggle("hidden");
 }
@@ -932,6 +950,8 @@ function handleItemListAction(event) {
     return;
   }
   if (button.dataset.action === "edit-item") {
+    state.activeTab = "items";
+    syncTabState();
     elements.itemForm.elements.id.value = item.id;
     elements.itemForm.elements.name.value = item.name;
     elements.itemForm.elements.unit.value = item.unit;
@@ -954,6 +974,8 @@ function handleVendorListAction(event) {
     return;
   }
   if (button.dataset.action === "edit-vendor") {
+    state.activeTab = "vendors";
+    syncTabState();
     elements.vendorForm.elements.id.value = vendor.id;
     elements.vendorForm.elements.name.value = vendor.name;
     elements.vendorForm.elements.contactPerson.value = vendor.contactPerson;
@@ -976,6 +998,8 @@ function handleMenuRecipeListAction(event) {
     return;
   }
   if (button.dataset.action === "edit-recipe") {
+    state.activeTab = "recipes";
+    syncTabState();
     elements.menuRecipeForm.elements.id.value = recipe.id;
     elements.menuRecipeForm.elements.name.value = recipe.name;
     elements.menuRecipeForm.elements.aliases.value = (recipe.aliases || []).join(", ");
@@ -1081,6 +1105,22 @@ function playAlarm() {
 
 function getLowStockItems(category) {
   return category.items.filter((item) => item.currentStock <= item.parStock);
+}
+
+function getVisibleItems(category) {
+  return (category.items || []).filter((item) => {
+    const matchesSearch = !state.inventorySearch || item.name.toLowerCase().includes(state.inventorySearch);
+    if (!matchesSearch) {
+      return false;
+    }
+    if (state.inventoryStatusFilter === "low") {
+      return item.currentStock > 0 && item.currentStock <= item.parStock;
+    }
+    if (state.inventoryStatusFilter === "out") {
+      return item.currentStock <= 0;
+    }
+    return true;
+  });
 }
 
 function getCategoryClosingsByDate(category, dateKey) {

@@ -59,6 +59,20 @@
           </aside>
 
           <div class="workspace-content surface-card">
+            <section class="workspace-toolbar">
+              <div class="workspace-toolbar-copy">
+                <strong>운영 데이터</strong>
+                <small>조회, 수정, 내보내기를 한 화면에서 처리합니다.</small>
+              </div>
+              <div class="workspace-toolbar-actions">
+                <input id="inventorySearchInput" type="search" placeholder="품목명 검색" />
+                <select id="inventoryStatusFilter">
+                  <option value="all">전체 상태</option>
+                  <option value="low">부족만</option>
+                  <option value="out">품절만</option>
+                </select>
+              </div>
+            </section>
             <div class="workspace-body">
             <section class="tab-panel active" data-panel="overview">
               <div id="workspaceAlert" class="critical-alert hidden"></div>
