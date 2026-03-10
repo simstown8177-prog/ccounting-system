@@ -42,27 +42,22 @@ const elements = {
   userForm: document.querySelector("#userForm"),
   purchaseForm: document.querySelector("#purchaseForm"),
   receiptForm: document.querySelector("#receiptForm"),
-  closingForm: document.querySelector("#closingForm"),
   receiptUploadForm: document.querySelector("#receiptUploadForm"),
   menuRecipeForm: document.querySelector("#menuRecipeForm"),
   ocrPreviewInput: document.querySelector("#ocrPreviewInput"),
   runOcrPreviewButton: document.querySelector("#runOcrPreviewButton"),
   confirmOcrDeductionButton: document.querySelector("#confirmOcrDeductionButton"),
   ocrPreviewResult: document.querySelector("#ocrPreviewResult"),
-  reportDateInput: document.querySelector("#reportDateInput"),
-  dailyReportCard: document.querySelector("#dailyReportCard"),
   itemList: document.querySelector("#itemList"),
   vendorList: document.querySelector("#vendorList"),
   userList: document.querySelector("#userList"),
   menuRecipeList: document.querySelector("#menuRecipeList"),
   userAdminNotice: document.querySelector("#userAdminNotice"),
   purchaseList: document.querySelector("#purchaseList"),
-  closingList: document.querySelector("#closingList"),
   receiptUploadList: document.querySelector("#receiptUploadList"),
   purchaseItemSelect: document.querySelector('#purchaseForm select[name="itemId"]'),
   purchaseVendorSelect: document.querySelector('#purchaseForm select[name="vendorId"]'),
   receiptOrderSelect: document.querySelector('#receiptForm select[name="purchaseOrderId"]'),
-  closingItemSelect: document.querySelector('#closingForm select[name="itemId"]'),
   receiptLineItems: document.querySelector("#receiptLineItems"),
   recipeIngredients: document.querySelector("#recipeIngredients"),
   addReceiptLineButton: document.querySelector("#addReceiptLineButton"),
@@ -96,14 +91,12 @@ function bindEvents() {
   elements.userForm.addEventListener("submit", handleUserSubmit);
   elements.purchaseForm.addEventListener("submit", handlePurchaseSubmit);
   elements.receiptForm.addEventListener("submit", handleReceiptSubmit);
-  elements.closingForm.addEventListener("submit", handleClosingSubmit);
   elements.receiptUploadForm.addEventListener("submit", handleReceiptUploadSubmit);
   elements.menuRecipeForm.addEventListener("submit", handleMenuRecipeSubmit);
   elements.runOcrPreviewButton.addEventListener("click", handleOcrPreview);
   elements.confirmOcrDeductionButton.addEventListener("click", handleOcrDeductionConfirm);
   elements.addReceiptLineButton.addEventListener("click", addReceiptLineRow);
   elements.addRecipeIngredientButton.addEventListener("click", addRecipeIngredientRow);
-  elements.reportDateInput.addEventListener("change", renderWorkspace);
   elements.kakaoForm.addEventListener("submit", handleKakaoSubmit);
   elements.copyKakaoMessageButton.addEventListener("click", copyKakaoMessage);
   elements.sendKakaoSimulationButton.addEventListener("click", handleKakaoSimulation);
@@ -205,9 +198,7 @@ function renderWorkspace() {
   renderUserSection(category, user);
   renderOrderForms(category);
   renderOrderList(category);
-  renderClosingList(category);
   renderReceiptUploadList(category);
-  renderDailyReport(category);
   renderKakaoSection(category);
   renderMenuRecipeSection(category, user);
   renderOcrPreview(category);
@@ -226,7 +217,7 @@ function syncTabState() {
 
 function renderWorkspaceStats(category) {
   const lowStockItems = getLowStockItems(category);
-  const todaysClosings = getCategoryClosingsByDate(category, getTodayDateKey());
+  const todaysClosings = (category.receiptUploads || []).filter((entry) => toDateKey(entry.createdAt) === getTodayDateKey());
   const openOrders = category.purchaseOrders.filter((order) => order.status !== "received");
 
   elements.metricItems.textContent = String(category.items.length);
@@ -356,7 +347,6 @@ function renderUserSection(category, user) {
 function renderOrderForms(category) {
   const itemOptions = buildItemOptions(category.items);
   elements.purchaseItemSelect.innerHTML = itemOptions;
-  elements.closingItemSelect.innerHTML = itemOptions;
   elements.purchaseVendorSelect.innerHTML = category.vendors.length
     ? category.vendors.map((vendor) => `<option value="${vendor.id}">${vendor.name}</option>`).join("")
     : '<option value="">거래처를 먼저 등록하세요</option>';
@@ -398,21 +388,6 @@ function renderOrderList(category) {
         <li class="activity-item">
           <p class="activity-title">${item?.name ?? "삭제된 품목"} ${formatQuantity(order.quantity)} ${item?.unit ?? ""}</p>
           <p class="activity-meta">${vendor?.name ?? "삭제된 거래처"} · ${statusLabel} · ${formatDateTime(order.createdAt)}</p>
-        </li>
-      `;
-    }),
-  );
-}
-
-function renderClosingList(category) {
-  renderList(
-    elements.closingList,
-    category.closings.map((closing) => {
-      const item = findById(category.items, closing.itemId);
-      return `
-        <li class="activity-item">
-          <p class="activity-title">${item?.name ?? "삭제된 품목"} ${formatQuantity(closing.usedQuantity)} ${item?.unit ?? ""}</p>
-          <p class="activity-meta">${closing.sourceLabel} · ${closing.note || "메모 없음"} · ${formatDateTime(closing.createdAt)}</p>
         </li>
       `;
     }),
@@ -461,25 +436,6 @@ function renderMenuRecipeSection(category, user) {
     .join("");
 }
 
-function renderDailyReport(category) {
-  const dateKey = elements.reportDateInput.value || getTodayDateKey();
-  if (!elements.reportDateInput.value) {
-    elements.reportDateInput.value = dateKey;
-  }
-
-  const closings = getCategoryClosingsByDate(category, dateKey);
-  if (!closings.length) {
-    elements.dailyReportCard.innerHTML = `${dateKey} 기준 차감 이력이 없습니다.`;
-    return;
-  }
-
-  const lines = closings.map((closing) => {
-    const item = findById(category.items, closing.itemId);
-    return `${formatTime(closing.createdAt)} · ${item?.name ?? "삭제된 품목"} · ${formatQuantity(closing.usedQuantity)} ${item?.unit ?? ""} · ${closing.sourceLabel}`;
-  });
-  elements.dailyReportCard.innerHTML = lines.join("<br />");
-}
-
 function renderKakaoSection(category) {
   if (category.kakaoConfig) {
     elements.kakaoForm.elements.senderName.value = category.kakaoConfig.senderName || "";
@@ -491,7 +447,7 @@ function renderKakaoSection(category) {
   const dispatch = category.lastKakaoDispatch;
   elements.kakaoDispatchStatus.innerHTML = dispatch
     ? `${formatDateTime(dispatch.requestedAt)} · ${dispatch.requestedBy} · ${dispatch.mode}`
-    : "아직 전송 시뮬레이션 이력이 없습니다.";
+    : "아직 카카오 알림 기록이 없습니다.";
 }
 
 function renderOcrPreview(category) {
@@ -675,27 +631,14 @@ async function handleReceiptSubmit(event) {
   }
 }
 
-async function handleClosingSubmit(event) {
-  event.preventDefault();
-  const formData = new FormData(event.currentTarget);
-  await mutateWorkspace("/api/closings", {
-    itemId: String(formData.get("itemId")),
-    usedQuantity: Number(formData.get("usedQuantity")),
-    note: String(formData.get("note")).trim(),
-    sourceLabel: "수동 마감",
-    createdAt: new Date().toISOString(),
-  });
-  event.currentTarget.reset();
-}
-
 async function handleReceiptUploadSubmit(event) {
   event.preventDefault();
   const formData = new FormData(event.currentTarget);
-  const file = formData.get("receiptImage");
+  const files = formData.getAll("receiptImage").filter((file) => file && file.size > 0);
   const lines = readReceiptRows();
 
-  if (!file || file.size === 0) {
-    window.alert("영수증 이미지를 선택하세요.");
+  if (!files.length) {
+    window.alert("영수증 파일을 한 개 이상 선택하세요.");
     return;
   }
 
@@ -704,15 +647,16 @@ async function handleReceiptUploadSubmit(event) {
     return;
   }
 
-  const previewDataUrl = await fileToDataUrl(file);
+  const filePayloads = await Promise.all(
+    files.map(async (file) => ({
+      fileName: file.name,
+      fileSize: file.size,
+      previewDataUrl: file.type.startsWith("image/") ? await fileToDataUrl(file) : "",
+    })),
+  );
   await mutateWorkspace("/api/receipt-uploads", {
-    fileName: file.name,
-    fileSize: file.size,
+    files: filePayloads,
     note: String(formData.get("note")).trim(),
-    createdAt: formData.get("usageDate")
-      ? new Date(String(formData.get("usageDate"))).toISOString()
-      : new Date().toISOString(),
-    previewDataUrl,
     lines,
   });
   event.currentTarget.reset();
@@ -736,6 +680,7 @@ async function handleMenuRecipeSubmit(event) {
     ingredients,
   });
   event.currentTarget.reset();
+  elements.menuRecipeForm.elements.id.value = "";
   elements.recipeIngredients.innerHTML = "";
   addRecipeIngredientRow();
 }
@@ -757,16 +702,27 @@ async function handleKakaoSimulation() {
       body: JSON.stringify({ message: elements.kakaoMessageOutput.value }),
     });
     state.workspaceCategory.lastKakaoDispatch = response.kakao.lastDispatch;
+    state.workspaceCategory.kakaoConfig = {
+      ...(state.workspaceCategory.kakaoConfig || {}),
+      senderName: elements.kakaoForm.elements.senderName.value,
+      channelId: elements.kakaoForm.elements.channelId.value,
+      notes: elements.kakaoForm.elements.notes.value,
+    };
     renderKakaoSection(state.workspaceCategory);
   } catch (error) {
-    handleWorkspaceError(error, "카카오 전송 시뮬레이션 중 오류가 발생했습니다.");
+    handleWorkspaceError(error, "카카오 알림 기록 중 오류가 발생했습니다.");
   }
 }
 
 async function handleOcrPreview() {
+  const receiptText = String(elements.ocrPreviewInput.value || "").trim();
+  if (!receiptText) {
+    window.alert("영수증 OCR 텍스트를 입력하세요.");
+    return;
+  }
   try {
     const response = await mutateWorkspace("/api/receipt-deductions/preview", {
-      receiptText: elements.ocrPreviewInput.value,
+      receiptText,
     });
     state.workspaceCategory.lastReceiptPreview = response.receiptPreview;
     renderOcrPreview(state.workspaceCategory);
@@ -860,13 +816,13 @@ async function enableAlerts() {
 
   if (!state.notificationEnabled) {
     persistClientState();
-    updateAlertButton();
+    updateSidebarAlertsButton();
     return;
   }
 
   if (!("PushManager" in window) || !state.serviceWorkerRegistration || !state.pushPublicKey) {
     persistClientState();
-    updateAlertButton();
+    updateSidebarAlertsButton();
     return;
   }
 
@@ -888,7 +844,7 @@ async function enableAlerts() {
   }
 
   persistClientState();
-  updateAlertButton();
+  updateSidebarAlertsButton();
 }
 
 function updateSidebarAlertsButton() {
@@ -1148,10 +1104,6 @@ function getVisibleItems(category) {
     }
     return true;
   });
-}
-
-function getCategoryClosingsByDate(category, dateKey) {
-  return category.closings.filter((closing) => toDateKey(closing.createdAt) === dateKey);
 }
 
 function getTodayDateKey() {

@@ -220,7 +220,6 @@ async function handleApi(req, res) {
       category.items = category.items.filter((item) => item.id !== body.id);
       category.purchaseOrders = category.purchaseOrders.filter((order) => order.itemId !== body.id);
       category.receipts = category.receipts.filter((receipt) => receipt.itemId !== body.id);
-      category.closings = category.closings.filter((closing) => closing.itemId !== body.id);
       category.menuRecipes = (category.menuRecipes || []).map((recipe) => ({
         ...recipe,
         ingredients: recipe.ingredients.filter((ingredient) => ingredient.itemId !== body.id),
@@ -323,45 +322,36 @@ async function handleApi(req, res) {
     });
   }
 
-  if (req.method === "POST" && pathname === "/api/closings") {
-    const body = await readJson(req);
-    return mutateCategory(res, session, (category) => {
-      applyClosing(category, {
-        itemId: body.itemId,
-        usedQuantity: number(body.usedQuantity),
-        note: body.note || "",
-        sourceLabel: body.sourceLabel || "수동 마감",
-        createdAt: body.createdAt || new Date().toISOString(),
-      });
-    });
-  }
-
   if (req.method === "POST" && pathname === "/api/receipt-uploads") {
     const body = await readJson(req);
     return mutateCategory(res, session, (category) => {
-      const uploadId = crypto.randomUUID();
-      const createdAt = body.createdAt || new Date().toISOString();
+      const createdAt = new Date().toISOString();
+      const files = Array.isArray(body.files) ? body.files : [];
       const lines = (body.lines || []).map((line) => ({
         itemId: line.itemId,
         quantity: number(line.quantity),
-      }));
+      })).filter((line) => line.itemId && line.quantity > 0);
+
       lines.forEach((line) => {
-        applyClosing(category, {
+        applyStockDeduction(category, {
           itemId: line.itemId,
           usedQuantity: line.quantity,
-          note: body.note || `${body.fileName} 업로드 차감`,
+          note: body.note || `${files.map((file) => file.fileName).join(", ") || "영수증"} 업로드 차감`,
           sourceLabel: "영수증 업로드",
           createdAt,
         });
       });
-      category.receiptUploads.unshift({
-        id: uploadId,
-        fileName: body.fileName,
-        fileSize: number(body.fileSize),
-        note: body.note || "",
-        lines,
-        previewDataUrl: body.previewDataUrl || "",
-        createdAt,
+
+      files.forEach((file) => {
+        category.receiptUploads.unshift({
+          id: crypto.randomUUID(),
+          fileName: file.fileName,
+          fileSize: number(file.fileSize),
+          note: body.note || "",
+          lines,
+          previewDataUrl: file.previewDataUrl || "",
+          createdAt,
+        });
       });
     });
   }
@@ -387,7 +377,7 @@ async function handleApi(req, res) {
       const receiptText = body.receiptText || preview.receiptText || "";
       preview.matchedMenus.forEach((matchedMenu) => {
         matchedMenu.ingredients.forEach((ingredient) => {
-          applyClosing(category, {
+          applyStockDeduction(category, {
             itemId: ingredient.itemId,
             usedQuantity: ingredient.totalQuantity,
             note: `${matchedMenu.menuName} ${matchedMenu.quantity}건 자동 차감`,
@@ -444,7 +434,6 @@ async function handleApi(req, res) {
   if (req.method === "POST" && pathname === "/api/integrations/kakao/send-order") {
     const body = await readJson(req);
     return mutateCategory(res, session, (category, user) => {
-      requireRole(user, "manager");
       const configured = Boolean(process.env.KAKAO_REST_API_KEY && process.env.KAKAO_TEMPLATE_ID);
       category.lastKakaoDispatch = {
         requestedAt: new Date().toISOString(),
@@ -544,7 +533,6 @@ function createInitialStore() {
       items: [],
       purchaseOrders: [],
       receipts: [],
-      closings: [],
       receiptUploads: [],
       pushSubscriptions: [],
       lastLowStockSignature: "",
@@ -609,14 +597,14 @@ function createSeedStore() {
       createRecipeIngredient(meat.items[3].id, "쌈장", "통", 0.05),
     ]),
   ];
-  applyClosing(pizza, {
+  applyStockDeduction(pizza, {
     itemId: pizza.items[0].id,
     usedQuantity: 2,
     note: "주문 영수증 일괄 차감",
     sourceLabel: "영수증 업로드",
     createdAt: new Date().toISOString(),
   });
-  applyClosing(meat, {
+  applyStockDeduction(meat, {
     itemId: meat.items[1].id,
     usedQuantity: 1,
     note: "점심 영업 마감",
@@ -627,20 +615,12 @@ function createSeedStore() {
   return store;
 }
 
-function applyClosing(category, payload) {
+function applyStockDeduction(category, payload) {
   const item = findById(category.items, payload.itemId);
   if (!item) {
     throw new Error("item_not_found");
   }
   item.currentStock = round(Math.max(0, item.currentStock - number(payload.usedQuantity)));
-  category.closings.unshift({
-    id: crypto.randomUUID(),
-    itemId: payload.itemId,
-    usedQuantity: number(payload.usedQuantity),
-    note: payload.note || "",
-    sourceLabel: payload.sourceLabel || "수동 마감",
-    createdAt: payload.createdAt || new Date().toISOString(),
-  });
 }
 
 function createUser(categoryName, username, password) {

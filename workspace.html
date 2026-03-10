@@ -47,7 +47,6 @@
               <button class="tab-button" data-tab="orders" type="button">발주/입고</button>
               <button class="tab-button" data-tab="recipes" type="button">메뉴/레시피</button>
               <button class="tab-button" data-tab="receipt" type="button">영수증 차감</button>
-              <button class="tab-button" data-tab="closing" type="button">마감 리포트</button>
               <button class="tab-button" data-tab="users" type="button">사용자</button>
               <button class="tab-button" data-tab="kakao" type="button">카카오 알림</button>
             </nav>
@@ -326,12 +325,8 @@
                   </div>
                   <form id="receiptUploadForm" class="stack-form">
                     <label>
-                      영수증 이미지
-                      <input name="receiptImage" type="file" accept="image/*" required />
-                    </label>
-                    <label>
-                      사용 일시
-                      <input name="usageDate" type="datetime-local" required />
+                      영수증 파일
+                      <input name="receiptImage" type="file" accept="image/*,.pdf" multiple required />
                     </label>
                     <label>
                       메모
@@ -362,65 +357,13 @@
                   <textarea
                     id="ocrPreviewInput"
                     class="message-box"
-                    placeholder="영수증 텍스트를 붙여넣으면 등록된 메뉴 레시피를 기준으로 자동 차감 후보를 계산합니다."
+                    placeholder="영수증 OCR 결과 텍스트를 붙여넣으면 등록된 메뉴 레시피를 기준으로 자동 차감 후보를 계산합니다."
                   ></textarea>
                   <div class="page-actions">
                     <button id="runOcrPreviewButton" class="secondary-button" type="button">자동 차감 검토</button>
                     <button id="confirmOcrDeductionButton" class="primary-button" type="button">자동 차감 확정</button>
                   </div>
                   <div id="ocrPreviewResult" class="report-card"></div>
-                </section>
-              </div>
-            </section>
-
-            <section class="tab-panel" data-panel="closing">
-              <div class="sub-grid">
-                <section class="sub-panel">
-                  <div class="section-heading">
-                    <div>
-                      <p class="section-label">마감</p>
-                      <h3>수동 마감 차감</h3>
-                    </div>
-                  </div>
-                  <form id="closingForm" class="form-grid">
-                    <label>
-                      품목
-                      <select name="itemId" required></select>
-                    </label>
-                    <label>
-                      사용량
-                      <input name="usedQuantity" type="number" min="0.1" step="0.1" required />
-                    </label>
-                    <label class="wide-field">
-                      메모
-                      <input name="note" type="text" placeholder="예: 저녁 마감 정산" />
-                    </label>
-                    <button type="submit" class="primary-button">마감 반영</button>
-                  </form>
-                </section>
-
-                <section class="sub-panel">
-                  <div class="section-heading">
-                    <div>
-                      <p class="section-label">리포트</p>
-                      <h3>일자별 마감 리포트</h3>
-                    </div>
-                  </div>
-                  <label>
-                    조회 날짜
-                    <input id="reportDateInput" type="date" />
-                  </label>
-                  <div id="dailyReportCard" class="report-card"></div>
-                </section>
-
-                <section class="sub-panel full-span">
-                  <div class="section-heading">
-                    <div>
-                      <p class="section-label">이력</p>
-                      <h3>최근 차감 이력</h3>
-                    </div>
-                  </div>
-                  <ul id="closingList" class="activity-list"></ul>
                 </section>
               </div>
             </section>
@@ -509,7 +452,7 @@
                   <textarea id="kakaoMessageOutput" class="message-box" readonly></textarea>
                   <div class="page-actions">
                     <button id="copyKakaoMessageButton" class="secondary-button" type="button">메시지 복사</button>
-                    <button id="sendKakaoSimulationButton" class="primary-button" type="button">카카오 전송 시뮬레이션</button>
+                    <button id="sendKakaoSimulationButton" class="primary-button" type="button">카카오 알림 기록</button>
                   </div>
                   <div id="kakaoDispatchStatus" class="report-card"></div>
                   <p class="helper-text">
