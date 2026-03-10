@@ -277,43 +277,58 @@ function renderInventoryTable(category) {
 
 function renderItemList(category) {
   const items = getVisibleItems(category);
-  renderList(
-    elements.itemList,
-    items.map(
-      (item) => `
-        <li class="activity-item activity-row">
-          <div>
-            <p class="activity-title">${item.name}</p>
-            <p class="activity-meta">현재 ${formatQuantity(item.currentStock)} ${item.unit} / 기준 ${formatQuantity(item.parStock)} ${item.unit}</p>
-          </div>
+  if (!items.length) {
+    elements.itemList.innerHTML = '<div class="erp-grid-empty">품목을 먼저 등록하세요.</div>';
+    return;
+  }
+
+  elements.itemList.innerHTML = items
+    .map((item) => {
+      const shortage = roundNumber(Math.max(0, item.parStock - item.currentStock));
+      const status =
+        item.currentStock <= 0
+          ? '<span class="status-chip status-danger">품절</span>'
+          : shortage > 0
+            ? '<span class="status-chip status-warning">부족</span>'
+            : '<span class="status-chip">정상</span>';
+
+      return `
+        <div class="erp-grid-row">
+          <strong>${item.name}</strong>
+          <span>${formatQuantity(item.currentStock)}</span>
+          <span>${formatQuantity(item.parStock)}</span>
+          <span>${item.unit}</span>
+          <span>${status}</span>
           <div class="row-actions">
             <button class="secondary-button compact-button" type="button" data-action="edit-item" data-id="${item.id}">수정</button>
             <button class="secondary-button compact-button danger-button" type="button" data-action="delete-item" data-id="${item.id}">삭제</button>
           </div>
-        </li>
-      `,
-    ),
-  );
+        </div>
+      `;
+    })
+    .join("");
 }
 
 function renderVendorList(category) {
-  renderList(
-    elements.vendorList,
-    category.vendors.map(
-      (vendor) => `
-        <li class="activity-item activity-row">
-          <div>
-            <p class="activity-title">${vendor.name}</p>
-            <p class="activity-meta">${vendor.contactPerson} · ${vendor.phone} · 카카오 ${vendor.kakaoId || "미등록"}</p>
-          </div>
-          <div class="row-actions">
-            <button class="secondary-button compact-button" type="button" data-action="edit-vendor" data-id="${vendor.id}">수정</button>
-            <button class="secondary-button compact-button danger-button" type="button" data-action="delete-vendor" data-id="${vendor.id}">삭제</button>
-          </div>
-        </li>
-      `,
-    ),
-  );
+  if (!category.vendors.length) {
+    elements.vendorList.innerHTML = '<div class="erp-grid-empty">등록된 거래처가 없습니다.</div>';
+    return;
+  }
+
+  elements.vendorList.innerHTML = category.vendors
+    .map((vendor) => `
+      <div class="erp-grid-row vendor-grid">
+        <strong>${vendor.name}</strong>
+        <span>${vendor.contactPerson}</span>
+        <span>${vendor.phone}</span>
+        <span>${vendor.kakaoId || "미등록"}</span>
+        <div class="row-actions">
+          <button class="secondary-button compact-button" type="button" data-action="edit-vendor" data-id="${vendor.id}">수정</button>
+          <button class="secondary-button compact-button danger-button" type="button" data-action="delete-vendor" data-id="${vendor.id}">삭제</button>
+        </div>
+      </div>
+    `)
+    .join("");
 }
 
 function renderUserSection(category, user) {
@@ -426,22 +441,24 @@ function renderMenuRecipeSection(category, user) {
     addRecipeIngredientRow();
   }
 
-  renderList(
-    elements.menuRecipeList,
-    (category.menuRecipes || []).map((recipe) => `
-      <li class="activity-item activity-row">
-        <div>
-          <p class="activity-title">${recipe.name}</p>
-          <p class="activity-meta">${(recipe.aliases || []).join(", ") || "별칭 없음"}</p>
-          <p class="activity-meta">${recipe.ingredients.map((ingredient) => `${ingredient.itemName} ${formatQuantity(ingredient.quantity)} ${ingredient.unit}`).join(" / ")}</p>
-        </div>
+  if (!(category.menuRecipes || []).length) {
+    elements.menuRecipeList.innerHTML = '<div class="erp-grid-empty">등록된 메뉴 레시피가 없습니다.</div>';
+    return;
+  }
+
+  elements.menuRecipeList.innerHTML = (category.menuRecipes || [])
+    .map((recipe) => `
+      <div class="erp-grid-row recipe-grid">
+        <strong>${recipe.name}</strong>
+        <span>${(recipe.aliases || []).join(", ") || "별칭 없음"}</span>
+        <span>${recipe.ingredients.map((ingredient) => `${ingredient.itemName} ${formatQuantity(ingredient.quantity)} ${ingredient.unit}`).join(" / ")}</span>
         <div class="row-actions">
           <button class="secondary-button compact-button" type="button" data-action="edit-recipe" data-id="${recipe.id}">수정</button>
           <button class="secondary-button compact-button danger-button" type="button" data-action="delete-recipe" data-id="${recipe.id}">삭제</button>
         </div>
-      </li>
-    `),
-  );
+      </div>
+    `)
+    .join("");
 }
 
 function renderDailyReport(category) {

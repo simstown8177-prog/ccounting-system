@@ -111,8 +111,8 @@
             </section>
 
             <section class="tab-panel" data-panel="items">
-              <div class="sub-grid">
-                <section class="sub-panel">
+              <div class="erp-split">
+                <section class="sub-panel erp-form-panel">
                   <div class="section-heading">
                     <div>
                       <p class="section-label">품목</p>
@@ -141,21 +141,31 @@
                   </form>
                 </section>
 
-                <section class="sub-panel full-span">
+                <section class="sub-panel erp-data-panel">
                   <div class="section-heading">
                     <div>
                       <p class="section-label">현황</p>
                       <h3>현재 품목 목록</h3>
                     </div>
                   </div>
-                  <ul id="itemList" class="activity-list"></ul>
+                  <div class="erp-grid">
+                    <div class="erp-grid-header">
+                      <span>품목명</span>
+                      <span>현재 재고</span>
+                      <span>최소 재고</span>
+                      <span>단위</span>
+                      <span>상태</span>
+                      <span>관리</span>
+                    </div>
+                    <div id="itemList" class="erp-grid-body"></div>
+                  </div>
                 </section>
               </div>
             </section>
 
             <section class="tab-panel" data-panel="vendors">
-              <div class="sub-grid">
-                <section class="sub-panel">
+              <div class="erp-split">
+                <section class="sub-panel erp-form-panel">
                   <div class="section-heading">
                     <div>
                       <p class="section-label">거래처</p>
@@ -184,14 +194,23 @@
                   </form>
                 </section>
 
-                <section class="sub-panel full-span">
+                <section class="sub-panel erp-data-panel">
                   <div class="section-heading">
                     <div>
                       <p class="section-label">목록</p>
                       <h3>등록 거래처</h3>
                     </div>
                   </div>
-                  <ul id="vendorList" class="activity-list"></ul>
+                  <div class="erp-grid">
+                    <div class="erp-grid-header vendor-grid">
+                      <span>거래처명</span>
+                      <span>담당자</span>
+                      <span>전화번호</span>
+                      <span>카카오</span>
+                      <span>관리</span>
+                    </div>
+                    <div id="vendorList" class="erp-grid-body"></div>
+                  </div>
                 </section>
               </div>
             </section>
@@ -255,8 +274,8 @@
             </section>
 
             <section class="tab-panel" data-panel="recipes">
-              <div class="sub-grid">
-                <section class="sub-panel">
+              <div class="erp-split">
+                <section class="sub-panel erp-form-panel">
                   <div class="section-heading">
                     <div>
                       <p class="section-label">메뉴</p>
@@ -281,14 +300,22 @@
                   </form>
                 </section>
 
-                <section class="sub-panel full-span">
+                <section class="sub-panel erp-data-panel">
                   <div class="section-heading">
                     <div>
                       <p class="section-label">목록</p>
                       <h3>등록된 메뉴 레시피</h3>
                     </div>
                   </div>
-                  <ul id="menuRecipeList" class="activity-list"></ul>
+                  <div class="erp-grid">
+                    <div class="erp-grid-header recipe-grid">
+                      <span>메뉴명</span>
+                      <span>OCR 별칭</span>
+                      <span>레시피</span>
+                      <span>관리</span>
+                    </div>
+                    <div id="menuRecipeList" class="erp-grid-body"></div>
+                  </div>
                 </section>
               </div>
             </section>

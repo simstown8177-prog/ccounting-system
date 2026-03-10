@@ -514,6 +514,22 @@ h3 {
   grid-template-columns: 340px minmax(0, 1fr);
 }
 
+.erp-split {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.erp-form-panel {
+  position: sticky;
+  top: 82px;
+}
+
+.erp-data-panel {
+  min-width: 0;
+}
+
 .sub-panel {
   padding: 20px;
   border-radius: var(--radius-md);
@@ -646,6 +662,60 @@ tbody tr.low-stock {
   gap: 0;
 }
 
+.erp-grid {
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
+.erp-grid-header,
+.erp-grid-row {
+  display: grid;
+  grid-template-columns: 1.6fr 0.8fr 0.8fr 0.7fr 0.9fr 160px;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+}
+
+.vendor-grid {
+  grid-template-columns: 1.2fr 0.8fr 1fr 1fr 160px;
+}
+
+.recipe-grid {
+  grid-template-columns: 1fr 1.1fr 1.6fr 160px;
+}
+
+.erp-grid-header {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.erp-grid-body .erp-grid-row {
+  border-bottom: 1px solid var(--border);
+}
+
+.erp-grid-body .erp-grid-row:last-child {
+  border-bottom: 0;
+}
+
+.erp-grid-row strong,
+.erp-grid-row span {
+  min-width: 0;
+}
+
+.erp-grid-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.erp-grid-empty {
+  padding: 16px 14px;
+  color: var(--muted);
+}
+
 .activity-title {
   margin-bottom: 6px;
   font-weight: 600;
@@ -732,6 +802,14 @@ tbody tr.low-stock {
   .sub-grid,
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .erp-split {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-form-panel {
+    position: static;
   }
 
   .line-item {
@@ -878,9 +956,14 @@ tbody tr.low-stock {
 
   .summary-grid,
   .sub-grid,
-  .form-grid {
+  .form-grid,
+  .erp-split {
     grid-template-columns: 1fr;
     gap: 12px;
+  }
+
+  .erp-form-panel {
+    position: static;
   }
 
   .metric-card,
@@ -931,6 +1014,15 @@ tbody tr.low-stock {
 
   table {
     min-width: 640px;
+  }
+
+  .erp-grid {
+    overflow-x: auto;
+  }
+
+  .erp-grid-header,
+  .erp-grid-row {
+    min-width: 760px;
   }
 
   th,
