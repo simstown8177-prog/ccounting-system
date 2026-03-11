@@ -1,4 +1,6 @@
 const CLIENT_STORAGE_KEY = "shop-n-shop-client-v1";
+const XLSX_CDN_URL = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
+const TESSERACT_CDN_URL = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
 const INVENTORY_IMPORT_ALIASES = {
   id: ["id", "품목id", "itemid"],
   productCode: ["상품코드", "품목코드", "productcode", "code"],
@@ -822,7 +824,9 @@ async function handleReceiptTextExtraction() {
     return;
   }
 
-  if (!window.Tesseract) {
+  try {
+    await ensureExternalScript("Tesseract", TESSERACT_CDN_URL);
+  } catch {
     window.alert("OCR 엔진을 불러오지 못했습니다. 잠시 후 다시 시도하세요.");
     return;
   }
@@ -1242,7 +1246,9 @@ async function handleInventoryImport() {
     return;
   }
 
-  if (!window.XLSX) {
+  try {
+    await ensureExternalScript("XLSX", XLSX_CDN_URL);
+  } catch {
     window.alert("엑셀 처리 라이브러리를 불러오지 못했습니다. 잠시 후 다시 시도하세요.");
     return;
   }
@@ -1618,6 +1624,54 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+async function ensureExternalScript(globalName, src) {
+  if (window[globalName]) {
+    return;
+  }
+
+  const existing = document.querySelector(`script[data-global="${globalName}"]`);
+  if (existing) {
+    await waitForScriptLoad(existing, globalName);
+    return;
+  }
+
+  const script = document.createElement("script");
+  script.src = src;
+  script.async = true;
+  script.dataset.global = globalName;
+  document.body.appendChild(script);
+  await waitForScriptLoad(script, globalName);
+}
+
+function waitForScriptLoad(script, globalName) {
+  return new Promise((resolve, reject) => {
+    if (window[globalName]) {
+      resolve();
+      return;
+    }
+
+    const handleLoad = () => {
+      cleanup();
+      if (window[globalName]) {
+        resolve();
+      } else {
+        reject(new Error(`${globalName}_load_failed`));
+      }
+    };
+    const handleError = () => {
+      cleanup();
+      reject(new Error(`${globalName}_load_failed`));
+    };
+    const cleanup = () => {
+      script.removeEventListener("load", handleLoad);
+      script.removeEventListener("error", handleError);
+    };
+
+    script.addEventListener("load", handleLoad);
+    script.addEventListener("error", handleError);
+  });
 }
 
 function urlBase64ToUint8Array(base64String) {
