@@ -4,6 +4,10 @@
   "private": true,
   "scripts": {
     "start": "node server.js",
+    "start:bg": "node scripts/runtime-manager.js start",
+    "status": "node scripts/runtime-manager.js status",
+    "stop": "node scripts/runtime-manager.js stop",
+    "test:runtime": "node scripts/smoke-runtime.js",
     "cap:sync": "npx cap sync",
     "cap:android": "npx cap open android",
     "cap:copy": "npx cap copy"

@@ -31,6 +31,40 @@ npm start
 
 그 다음 브라우저에서 `http://localhost:3000`으로 접속하면 됩니다.
 
+Studio 터미널 연결이 흔들려도 서버를 계속 살려야 하면 아래 백그라운드 런처를 사용합니다.
+
+```bash
+npm run start:bg
+npm run status
+npm run stop
+```
+
+- `npm run start:bg`: 서버를 터미널과 분리된 백그라운드 프로세스로 실행
+- `npm run status`: `/api/health` 기준으로 상태 확인
+- `npm run stop`: pid 파일 기준으로 정상 종료 시도 후 정리
+- `npm run test:runtime`: 백그라운드 기동/헬스체크/종료 스모크 테스트
+
+## Android APK 빌드
+
+현재 Capacitor Android 프로젝트는 운영 서버 `https://ccounting-system.onrender.com` 를 보도록 설정되어 있습니다.
+
+사전 조건:
+
+- `JDK 21`
+- Android SDK
+- `android/local.properties` 에 SDK 경로 지정 예시: `sdk.dir=/home/user/.androidsdkroot`
+
+디버그 APK 빌드:
+
+```bash
+cd android
+./gradlew --no-daemon assembleDebug
+```
+
+생성 경로:
+
+- `android/app/build/outputs/apk/debug/app-debug.apk`
+
 운영 데이터는 `DATABASE_URL`이 있으면 외부 Postgres에 저장되고, 없으면 로컬
 [data/app.db](/home/user/ccounting-system/data/app.db)에 저장됩니다.
 

@@ -12,6 +12,7 @@ const DATA_DIR = path.join(ROOT, "data");
 const STORE_PATH = path.join(DATA_DIR, "store.json");
 const DB_PATH = process.env.DB_PATH || path.join(DATA_DIR, "app.db");
 const DATABASE_URL = process.env.DATABASE_URL || "";
+const SERVER_STARTED_AT = new Date().toISOString();
 
 const CATEGORY_DEFINITIONS = [
   { id: "pizza-cheese-bbal", name: "피자는치즈빨", description: "피자 브랜드 운영 공간" },
@@ -23,6 +24,8 @@ const CATEGORY_DEFINITIONS = [
 
 const sessions = new Map();
 let storeDb;
+let httpServer;
+let isShuttingDown = false;
 
 main().catch((error) => {
   console.error(error);
@@ -33,7 +36,7 @@ async function main() {
   await ensureStore();
   await configureWebPush();
 
-  const server = http.createServer(async (req, res) => {
+  httpServer = http.createServer(async (req, res) => {
     try {
       if (req.url.startsWith("/api/")) {
         await handleApi(req, res);
@@ -46,13 +49,25 @@ async function main() {
     }
   });
 
-  server.listen(PORT, HOST, () => {
+  bindProcessSignals();
+
+  httpServer.listen(PORT, HOST, () => {
     console.log(`Server running on http://${HOST}:${PORT}`);
   });
 }
 
 async function handleApi(req, res) {
   const { pathname } = new URL(req.url, `http://${req.headers.host}`);
+
+  if (req.method === "GET" && pathname === "/api/health") {
+    return sendJson(res, 200, {
+      ok: !isShuttingDown,
+      status: isShuttingDown ? "shutting_down" : "ready",
+      uptimeSeconds: Math.floor(process.uptime()),
+      startedAt: SERVER_STARTED_AT,
+      pid: process.pid,
+    });
+  }
 
   if (req.method === "GET" && pathname === "/api/bootstrap") {
     const store = await readStore();
@@ -1480,4 +1495,58 @@ function formatTaxType(value) {
 
 function roundCurrency(value) {
   return Math.round(number(value));
+}
+
+function bindProcessSignals() {
+  process.on("SIGINT", () => {
+    shutdown("SIGINT");
+  });
+  process.on("SIGTERM", () => {
+    shutdown("SIGTERM");
+  });
+  process.on("uncaughtException", (error) => {
+    console.error("Uncaught exception", error);
+    shutdown("uncaughtException", 1);
+  });
+  process.on("unhandledRejection", (error) => {
+    console.error("Unhandled rejection", error);
+    shutdown("unhandledRejection", 1);
+  });
+}
+
+function shutdown(reason, exitCode = 0) {
+  if (isShuttingDown) {
+    return;
+  }
+
+  isShuttingDown = true;
+  console.log(`Shutting down server (${reason})`);
+
+  const finalize = () => {
+    try {
+      storeDb?.close?.();
+    } catch (error) {
+      console.error("Failed to close store database", error);
+      exitCode = 1;
+    }
+    process.exit(exitCode);
+  };
+
+  if (!httpServer) {
+    finalize();
+    return;
+  }
+
+  httpServer.close((error) => {
+    if (error) {
+      console.error("Failed to close HTTP server", error);
+      exitCode = 1;
+    }
+    finalize();
+  });
+
+  setTimeout(() => {
+    console.error("Forced shutdown after timeout");
+    finalize();
+  }, 5000).unref();
 }
