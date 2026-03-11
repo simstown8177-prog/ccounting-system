@@ -548,6 +548,14 @@ h3 {
   grid-column: 1 / -1;
 }
 
+.import-block {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
 label {
   display: grid;
   gap: 8px;

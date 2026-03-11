@@ -1,4 +1,11 @@
 const CLIENT_STORAGE_KEY = "shop-n-shop-client-v1";
+const INVENTORY_IMPORT_ALIASES = {
+  id: ["id", "품목id", "itemid"],
+  name: ["품목명", "품목", "name", "itemname", "item"],
+  unit: ["단위", "unit"],
+  currentStock: ["현재재고", "현재수량", "재고", "currentstock", "stock", "quantity"],
+  parStock: ["기준재고", "최소재고", "안전재고", "parstock", "minstock", "safetystock"],
+};
 
 const clientState = readClientState();
 
@@ -38,6 +45,10 @@ const elements = {
   metricTodayClosings: document.querySelector("#metricTodayClosings"),
   inventoryTableBody: document.querySelector("#inventoryTableBody"),
   itemForm: document.querySelector("#itemForm"),
+  resetItemFormButton: document.querySelector("#resetItemFormButton"),
+  itemSubmitButton: document.querySelector("#itemSubmitButton"),
+  inventoryImportFile: document.querySelector("#inventoryImportFile"),
+  inventoryImportButton: document.querySelector("#inventoryImportButton"),
   vendorForm: document.querySelector("#vendorForm"),
   userForm: document.querySelector("#userForm"),
   purchaseForm: document.querySelector("#purchaseForm"),
@@ -87,6 +98,8 @@ function bindEvents() {
   elements.vendorList.addEventListener("click", handleVendorListAction);
   elements.menuRecipeList.addEventListener("click", handleMenuRecipeListAction);
   elements.itemForm.addEventListener("submit", handleItemSubmit);
+  elements.resetItemFormButton.addEventListener("click", resetItemForm);
+  elements.inventoryImportButton.addEventListener("click", handleInventoryImport);
   elements.vendorForm.addEventListener("submit", handleVendorSubmit);
   elements.userForm.addEventListener("submit", handleUserSubmit);
   elements.purchaseForm.addEventListener("submit", handlePurchaseSubmit);
@@ -562,7 +575,7 @@ async function handleItemSubmit(event) {
     currentStock: Number(formData.get("currentStock")),
     parStock: Number(formData.get("parStock")),
   });
-  event.currentTarget.reset();
+  resetItemForm();
 }
 
 async function handleVendorSubmit(event) {
@@ -818,6 +831,12 @@ function handleWorkspaceError(error, fallbackMessage) {
     return;
   }
 
+  if (typeof error.message === "string" && error.message.startsWith("import_row_invalid:")) {
+    const [, rowNumber] = error.message.split(":");
+    window.alert(`엑셀 업로드 ${rowNumber}행을 확인하세요. 품목명과 단위는 필수입니다.`);
+    return;
+  }
+
   const messageMap = {
     menu_name_required: "판매 메뉴명을 입력하세요.",
     recipe_ingredients_required: "레시피 재료를 한 줄 이상 입력하세요.",
@@ -825,6 +844,7 @@ function handleWorkspaceError(error, fallbackMessage) {
     preview_required: "자동 차감 검토 결과가 없습니다. OCR 텍스트를 다시 검토하세요.",
     receipt_files_required: "영수증 파일을 한 개 이상 선택하세요.",
     ocr_empty_result: "영수증 이미지에서 읽어낸 텍스트가 없습니다.",
+    import_rows_required: "엑셀 파일에서 반영할 재고 행을 찾지 못했습니다.",
   };
 
   window.alert(messageMap[error.message] || fallbackMessage);
@@ -974,17 +994,30 @@ function handleItemListAction(event) {
   }
   if (button.dataset.action === "edit-item") {
     state.activeTab = "items";
+    persistClientState();
     syncTabState();
-    elements.itemForm.elements.id.value = item.id;
-    elements.itemForm.elements.name.value = item.name;
-    elements.itemForm.elements.unit.value = item.unit;
-    elements.itemForm.elements.currentStock.value = item.currentStock;
-    elements.itemForm.elements.parStock.value = item.parStock;
+    setItemFormValues(item);
+    elements.itemForm.elements.name.focus();
     return;
   }
   if (button.dataset.action === "delete-item" && window.confirm("이 품목을 삭제할까요?")) {
     mutateWorkspace("/api/items/delete", { id: item.id });
   }
+}
+
+function setItemFormValues(item = null) {
+  elements.itemForm.reset();
+  elements.itemForm.elements.id.value = item?.id || "";
+  elements.itemForm.elements.name.value = item?.name || "";
+  elements.itemForm.elements.unit.value = item?.unit || "";
+  elements.itemForm.elements.currentStock.value = item ? item.currentStock : "";
+  elements.itemForm.elements.parStock.value = item ? item.parStock : "";
+  elements.itemSubmitButton.textContent = item ? "품목 수정" : "품목 저장";
+}
+
+function resetItemForm() {
+  setItemFormValues();
+  elements.itemForm.elements.name.focus();
 }
 
 function handleVendorListAction(event) {
@@ -1093,6 +1126,99 @@ function fileToDataUrl(file) {
     reader.addEventListener("error", reject);
     reader.readAsDataURL(file);
   });
+}
+
+async function handleInventoryImport() {
+  const file = elements.inventoryImportFile.files?.[0];
+  if (!file) {
+    window.alert("업로드할 엑셀 파일을 먼저 선택하세요.");
+    return;
+  }
+
+  if (!window.XLSX) {
+    window.alert("엑셀 처리 라이브러리를 불러오지 못했습니다. 잠시 후 다시 시도하세요.");
+    return;
+  }
+
+  try {
+    const rows = await parseInventoryImportFile(file);
+    if (!rows.length) {
+      throw new Error("import_rows_required");
+    }
+
+    const response = await mutateWorkspace("/api/items/import", { rows });
+    resetItemForm();
+    elements.inventoryImportFile.value = "";
+    const summary = response.importSummary || {};
+    window.alert(`엑셀 반영 완료: 신규 ${summary.created || 0}건, 수정 ${summary.updated || 0}건`);
+  } catch (error) {
+    if (error.status) {
+      return;
+    }
+    handleWorkspaceError(error, "엑셀 업로드 중 오류가 발생했습니다.");
+  }
+}
+
+async function parseInventoryImportFile(file) {
+  const workbook = window.XLSX.read(await file.arrayBuffer(), { type: "array" });
+  const firstSheetName = workbook.SheetNames[0];
+  if (!firstSheetName) {
+    return [];
+  }
+
+  return window.XLSX.utils
+    .sheet_to_json(workbook.Sheets[firstSheetName], { defval: "" })
+    .map((row, index) => normalizeInventoryImportRow(row, index))
+    .filter(Boolean);
+}
+
+function normalizeInventoryImportRow(row, index) {
+  const normalizedRow = Object.entries(row).reduce((result, [key, value]) => {
+    result[normalizeImportHeader(key)] = value;
+    return result;
+  }, {});
+
+  const item = {
+    id: String(getInventoryImportValue(normalizedRow, INVENTORY_IMPORT_ALIASES.id) || "").trim(),
+    name: String(getInventoryImportValue(normalizedRow, INVENTORY_IMPORT_ALIASES.name) || "").trim(),
+    unit: String(getInventoryImportValue(normalizedRow, INVENTORY_IMPORT_ALIASES.unit) || "").trim(),
+    currentStock: parseInventoryImportNumber(getInventoryImportValue(normalizedRow, INVENTORY_IMPORT_ALIASES.currentStock)),
+    parStock: parseInventoryImportNumber(getInventoryImportValue(normalizedRow, INVENTORY_IMPORT_ALIASES.parStock)),
+  };
+
+  if (!item.id && !item.name && !item.unit && item.currentStock === 0 && item.parStock === 0) {
+    return null;
+  }
+
+  if (!item.name || !item.unit) {
+    throw new Error(`import_row_invalid:${index + 2}`);
+  }
+
+  return item;
+}
+
+function getInventoryImportValue(row, aliases) {
+  for (const alias of aliases) {
+    const value = row[normalizeImportHeader(alias)];
+    if (value !== undefined && value !== null && String(value).trim() !== "") {
+      return value;
+    }
+  }
+  return "";
+}
+
+function parseInventoryImportNumber(value) {
+  const normalized = String(value || "")
+    .replace(/,/g, "")
+    .trim();
+  return normalized ? Number(normalized) || 0 : 0;
+}
+
+function normalizeImportHeader(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/[()\-_/]/g, "");
 }
 
 function buildKakaoMessage(category) {

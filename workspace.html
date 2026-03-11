@@ -131,8 +131,28 @@
                       기준 재고
                       <input name="parStock" type="number" min="0" step="0.1" required />
                     </label>
-                    <button type="submit" class="primary-button">품목 저장</button>
+                    <div class="page-actions wide-field">
+                      <button id="resetItemFormButton" type="button" class="secondary-button">입력 초기화</button>
+                      <button id="itemSubmitButton" type="submit" class="primary-button">품목 저장</button>
+                    </div>
                   </form>
+                  <div class="import-block">
+                    <label>
+                      엑셀 업로드
+                      <input
+                        id="inventoryImportFile"
+                        name="inventoryImportFile"
+                        type="file"
+                        accept=".xlsx,.xls,.csv"
+                      />
+                    </label>
+                    <div class="page-actions">
+                      <button id="inventoryImportButton" type="button" class="secondary-button">엑셀 반영</button>
+                    </div>
+                    <p class="helper-text">
+                      품목명, 단위, 현재재고, 기준재고 열이 있는 `.xlsx`, `.xls`, `.csv` 파일을 올리면 재고 목록에 일괄 반영됩니다.
+                    </p>
+                  </div>
                 </section>
 
                 <section class="sub-panel erp-data-panel">
@@ -479,6 +499,7 @@
       <li class="empty-state">등록된 내역이 없습니다.</li>
     </template>
 
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="workspace.js"></script>
   </body>

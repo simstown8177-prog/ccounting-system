@@ -214,6 +214,22 @@ async function handleApi(req, res) {
     });
   }
 
+  if (req.method === "POST" && pathname === "/api/items/import") {
+    const body = await readJson(req);
+    let importSummary = null;
+    return mutateCategory(
+      res,
+      session,
+      (category) => {
+        importSummary = importInventoryRows(category, body.rows);
+      },
+      (category) => ({
+        category: sanitizeCategory(category),
+        importSummary,
+      }),
+    );
+  }
+
   if (req.method === "POST" && pathname === "/api/items/delete") {
     const body = await readJson(req);
     return mutateCategory(res, session, (category) => {
@@ -993,6 +1009,59 @@ function validateRecipePayload(body, items) {
   if (!validIngredients.length) {
     throw new Error("recipe_ingredient_item_not_found");
   }
+}
+
+function importInventoryRows(category, rows) {
+  if (!Array.isArray(rows) || !rows.length) {
+    throw new Error("import_rows_required");
+  }
+
+  const summary = { created: 0, updated: 0 };
+
+  rows.forEach((rawRow, index) => {
+    const row = normalizeInventoryImportRow(rawRow, index);
+    const existingItem =
+      (row.id ? findById(category.items, row.id) : null) ||
+      category.items.find((item) => normalizeToken(item.name) === normalizeToken(row.name));
+
+    if (existingItem) {
+      existingItem.name = row.name;
+      existingItem.unit = row.unit;
+      existingItem.currentStock = row.currentStock;
+      existingItem.parStock = row.parStock;
+      summary.updated += 1;
+      return;
+    }
+
+    category.items.unshift({
+      id: crypto.randomUUID(),
+      name: row.name,
+      unit: row.unit,
+      currentStock: row.currentStock,
+      parStock: row.parStock,
+    });
+    summary.created += 1;
+  });
+
+  return summary;
+}
+
+function normalizeInventoryImportRow(rawRow, index) {
+  const row = rawRow && typeof rawRow === "object" ? rawRow : {};
+  const name = String(row.name || "").trim();
+  const unit = String(row.unit || "").trim();
+
+  if (!name || !unit) {
+    throw new Error(`import_row_invalid:${index + 1}`);
+  }
+
+  return {
+    id: String(row.id || "").trim(),
+    name,
+    unit,
+    currentStock: round(number(row.currentStock)),
+    parStock: round(number(row.parStock)),
+  };
 }
 
 function buildMenuRecipe(body, items) {
