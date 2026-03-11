@@ -1,0 +1,38 @@
+{
+  "name": "샵앤샵 재고관리",
+  "short_name": "샵앤샵",
+  "description": "안드로이드와 윈도우에서 사용할 수 있는 재고관리 앱",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5f7fb",
+  "theme_color": "#2563eb",
+  "lang": "ko-KR",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/app-icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "로그인",
+      "short_name": "로그인",
+      "url": "/login.html"
+    },
+    {
+      "name": "메인 화면",
+      "short_name": "메인",
+      "url": "/"
+    }
+  ]
+}
