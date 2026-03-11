@@ -5,3 +5,5 @@ data/*.db-wal
 .env
 .runtime/
 android/local.properties
+android/keystore.properties
+android/*.jks
