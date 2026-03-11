@@ -1,0 +1,14 @@
+{
+  "appId": "com.shopnshop.inventory",
+  "appName": "샵앤샵 재고관리",
+  "webDir": "app-shell",
+  "bundledWebRuntime": false,
+  "server": {
+    "url": "http://10.0.2.2:3000",
+    "cleartext": true,
+    "androidScheme": "http"
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}

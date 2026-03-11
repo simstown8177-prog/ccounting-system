@@ -22,6 +22,7 @@
 3. Android 앱 패키징
 - 이후 필요 시 `Capacitor` 로 감싼다.
 - 핵심 화면/로직/API 는 그대로 재사용한다.
+- 현재 저장소에는 `capacitor.config.json` 과 `android/` 프로젝트 골격이 추가되어 있다.
 
 ## 수정 방식
 
@@ -41,5 +42,8 @@
 ## 다음 단계
 
 1. 모바일 화면 최적화
-2. Android 테스트용 패키징 도입 여부 결정
-3. 파일 업로드/다운로드, OCR, 알림 기능의 Android 실기기 점검
+2. `capacitor.config.json` 의 `server.url` 을 실제 운영 주소로 변경
+3. `npm run cap:sync`
+4. `npm run cap:android`
+5. Android Studio 에서 APK 또는 AAB 빌드
+6. 파일 업로드/다운로드, OCR, 알림 기능의 Android 실기기 점검
