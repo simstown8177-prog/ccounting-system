@@ -13,6 +13,7 @@ const STORE_PATH = path.join(DATA_DIR, "store.json");
 const DB_PATH = process.env.DB_PATH || path.join(DATA_DIR, "app.db");
 const DATABASE_URL = process.env.DATABASE_URL || "";
 const SERVER_STARTED_AT = new Date().toISOString();
+const APP_DOWNLOAD_URL = process.env.APP_DOWNLOAD_URL || "";
 const RELEASE_APK_PATH = path.join(ROOT, "android", "app", "build", "outputs", "apk", "release", "app-release.apk");
 const RELEASE_APK_DOWNLOAD_PATH = "/downloads/shopnshop-release.apk";
 
@@ -73,15 +74,12 @@ async function handleApi(req, res) {
 
   if (req.method === "GET" && pathname === "/api/bootstrap") {
     const store = await readStore();
+    const appDownload = getAppDownloadConfig();
     return sendJson(res, 200, {
       categories: store.categories.map(toPublicCategory),
       notificationSupported: true,
       pushPublicKey: getPublicVapidKey(store),
-      appDownload: {
-        available: fs.existsSync(RELEASE_APK_PATH),
-        url: RELEASE_APK_DOWNLOAD_PATH,
-        filename: "shopnshop-release.apk",
-      },
+      appDownload,
     });
   }
 
@@ -878,6 +876,24 @@ function serveReleaseApk(res) {
     "Cache-Control": "no-cache",
   });
   fs.createReadStream(RELEASE_APK_PATH).pipe(res);
+}
+
+function getAppDownloadConfig() {
+  if (APP_DOWNLOAD_URL) {
+    return {
+      available: true,
+      url: APP_DOWNLOAD_URL,
+      filename: "shopnshop-release.apk",
+      external: true,
+    };
+  }
+
+  return {
+    available: fs.existsSync(RELEASE_APK_PATH),
+    url: RELEASE_APK_DOWNLOAD_PATH,
+    filename: "shopnshop-release.apk",
+    external: false,
+  };
 }
 
 function toPublicCategory(category) {
