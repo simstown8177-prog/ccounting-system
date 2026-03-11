@@ -56,6 +56,10 @@ const elements = {
   metricTodayClosings: document.querySelector("#metricTodayClosings"),
   inventoryTableBody: document.querySelector("#inventoryTableBody"),
   itemForm: document.querySelector("#itemForm"),
+  itemModal: document.querySelector("#itemModal"),
+  itemModalTitle: document.querySelector("#itemModalTitle"),
+  openItemModalButton: document.querySelector("#openItemModalButton"),
+  closeItemModalButton: document.querySelector("#closeItemModalButton"),
   resetItemFormButton: document.querySelector("#resetItemFormButton"),
   itemSubmitButton: document.querySelector("#itemSubmitButton"),
   inventoryImportFile: document.querySelector("#inventoryImportFile"),
@@ -115,6 +119,8 @@ function bindEvents() {
   elements.vendorList.addEventListener("click", handleVendorListAction);
   elements.menuRecipeList.addEventListener("click", handleMenuRecipeListAction);
   elements.itemForm.addEventListener("submit", handleItemSubmit);
+  elements.openItemModalButton.addEventListener("click", openNewItemModal);
+  elements.closeItemModalButton.addEventListener("click", closeItemModal);
   elements.resetItemFormButton.addEventListener("click", resetItemForm);
   elements.inventoryImportButton.addEventListener("click", handleInventoryImport);
   elements.inventoryCategoryTabs.addEventListener("click", handleInventoryCategoryTabClick);
@@ -586,17 +592,20 @@ async function exportInventoryCsv() {
       headers: { Authorization: `Bearer ${state.authToken}` },
     });
     if (!response.ok) {
-      throw new Error("export_failed");
+      const message = await response.text();
+      throw new Error(message || "export_failed");
     }
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
     link.download = `${state.workspaceCategory.id}-inventory.csv`;
+    document.body.appendChild(link);
     link.click();
+    link.remove();
     URL.revokeObjectURL(url);
-  } catch {
-    window.alert("재고 CSV 다운로드 중 오류가 발생했습니다.");
+  } catch (error) {
+    window.alert(`재고 CSV 다운로드 중 오류가 발생했습니다.${error.message && error.message !== "export_failed" ? `\n${error.message}` : ""}`);
   }
 }
 
@@ -628,6 +637,7 @@ async function handleItemSubmit(event) {
     parStock: Number(formData.get("parStock")),
   });
   resetItemForm();
+  closeItemModal();
 }
 
 async function handleVendorSubmit(event) {
@@ -1101,7 +1111,7 @@ function handleItemListAction(event) {
     persistClientState();
     syncTabState();
     setItemFormValues(item);
-    elements.itemForm.elements.name.focus();
+    openItemModal();
     return;
   }
   if (button.dataset.action === "delete-item" && window.confirm("이 품목을 삭제할까요?")) {
@@ -1124,11 +1134,30 @@ function setItemFormValues(item = null) {
   elements.itemForm.elements.currentStock.value = item ? item.currentStock : "";
   elements.itemForm.elements.parStock.value = item ? item.parStock : "";
   elements.itemSubmitButton.textContent = item ? "품목 수정" : "품목 저장";
+  elements.itemModalTitle.textContent = item ? "재고 품목 수정" : "재고 품목 등록";
 }
 
 function resetItemForm() {
   setItemFormValues();
+  if (!elements.itemModal.classList.contains("hidden")) {
+    elements.itemForm.elements.name.focus();
+  }
+}
+
+function openNewItemModal() {
+  resetItemForm();
+  openItemModal();
+}
+
+function openItemModal() {
+  elements.itemModal.classList.remove("hidden");
+  document.body.classList.add("modal-open");
   elements.itemForm.elements.name.focus();
+}
+
+function closeItemModal() {
+  elements.itemModal.classList.add("hidden");
+  document.body.classList.remove("modal-open");
 }
 
 function handleVendorListAction(event) {
