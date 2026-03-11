@@ -197,8 +197,15 @@ async function handleApi(req, res) {
         if (!item) {
           throw new Error("item_not_found");
         }
+        item.productCode = body.productCode || "";
         item.name = body.name;
+        item.category = normalizeItemCategory(body.category);
         item.unit = body.unit;
+        item.origin = body.origin || "";
+        item.storageType = body.storageType || "";
+        item.storageLocation = body.storageLocation || "";
+        item.purchasePrice = roundCurrency(body.purchasePrice);
+        item.taxType = normalizeTaxType(body.taxType);
         item.currentStock = number(body.currentStock);
         item.parStock = number(body.parStock);
         return;
@@ -206,8 +213,15 @@ async function handleApi(req, res) {
 
       category.items.unshift({
         id: crypto.randomUUID(),
+        productCode: body.productCode || "",
         name: body.name,
+        category: normalizeItemCategory(body.category),
         unit: body.unit,
+        origin: body.origin || "",
+        storageType: body.storageType || "",
+        storageLocation: body.storageLocation || "",
+        purchasePrice: roundCurrency(body.purchasePrice),
+        taxType: normalizeTaxType(body.taxType),
         currentStock: number(body.currentStock),
         parStock: number(body.parStock),
       });
@@ -228,6 +242,35 @@ async function handleApi(req, res) {
         importSummary,
       }),
     );
+  }
+
+  if (req.method === "POST" && pathname === "/api/item-categories/rename") {
+    const body = await readJson(req);
+    return mutateCategory(res, session, (category) => {
+      const previousName = normalizeItemCategory(body.previousName);
+      const rawNextName = String(body.nextName || "").trim();
+      if (!rawNextName) {
+        throw new Error("category_name_required");
+      }
+      const nextName = normalizeItemCategory(rawNextName);
+      category.items.forEach((item) => {
+        if (normalizeItemCategory(item.category) === previousName) {
+          item.category = nextName;
+        }
+      });
+    });
+  }
+
+  if (req.method === "POST" && pathname === "/api/item-categories/delete") {
+    const body = await readJson(req);
+    return mutateCategory(res, session, (category) => {
+      const targetName = normalizeItemCategory(body.categoryName);
+      category.items.forEach((item) => {
+        if (normalizeItemCategory(item.category) === targetName) {
+          item.category = "미분류";
+        }
+      });
+    });
   }
 
   if (req.method === "POST" && pathname === "/api/items/delete") {
@@ -305,11 +348,21 @@ async function handleApi(req, res) {
   if (req.method === "POST" && pathname === "/api/purchase-orders") {
     const body = await readJson(req);
     return mutateCategory(res, session, (category) => {
+      const item = findById(category.items, body.itemId);
+      if (!item) {
+        throw new Error("item_not_found");
+      }
+      const totals = calculateOrderAmounts(item, body.quantity);
       category.purchaseOrders.unshift({
         id: crypto.randomUUID(),
         itemId: body.itemId,
         vendorId: body.vendorId,
         quantity: number(body.quantity),
+        taxType: totals.taxType,
+        unitPrice: totals.unitPrice,
+        totalAmount: totals.totalAmount,
+        supplyAmount: totals.supplyAmount,
+        vatAmount: totals.vatAmount,
         status: "ordered",
         createdAt: new Date().toISOString(),
       });
@@ -687,8 +740,33 @@ function createUser(categoryName, username, password) {
   );
 }
 
-function createItem(name, unit, currentStock, parStock) {
-  return { id: crypto.randomUUID(), name, unit, currentStock, parStock };
+function createItem(
+  name,
+  unit,
+  currentStock,
+  parStock,
+  storageType = "",
+  storageLocation = "",
+  purchasePrice = 0,
+  taxType = "taxable",
+  productCode = "",
+  category = "미분류",
+  origin = "",
+) {
+  return {
+    id: crypto.randomUUID(),
+    productCode,
+    name,
+    category: normalizeItemCategory(category),
+    unit,
+    currentStock,
+    parStock,
+    origin,
+    storageType,
+    storageLocation,
+    purchasePrice: roundCurrency(purchasePrice),
+    taxType: normalizeTaxType(taxType),
+  };
 }
 
 function createMenuRecipe(name, aliases, ingredients) {
@@ -773,6 +851,17 @@ function toPublicCategory(category) {
 function sanitizeCategory(category) {
   return {
     ...category,
+    items: (category.items || []).map((item) => ({
+      ...item,
+      productCode: item.productCode || "",
+      category: normalizeItemCategory(item.category),
+      origin: item.origin || "",
+      storageType: item.storageType || "",
+      storageLocation: item.storageLocation || "",
+      purchasePrice: roundCurrency(item.purchasePrice),
+      taxType: normalizeTaxType(item.taxType),
+    })),
+    purchaseOrders: (category.purchaseOrders || []).map((order) => enrichPurchaseOrder(order, category.items || [])),
     users: category.users.map(sanitizeUser),
     menuRecipes: (category.menuRecipes || []).map((recipe) => ({
       ...recipe,
@@ -824,6 +913,17 @@ function migrateStore(store) {
     categories: (store.categories || []).map((category, index) => ({
       ...CATEGORY_DEFINITIONS[index],
       ...category,
+      items: (category.items || []).map((item) => ({
+        ...item,
+        productCode: item.productCode || "",
+        category: normalizeItemCategory(item.category),
+        origin: item.origin || "",
+        storageType: item.storageType || "",
+        storageLocation: item.storageLocation || "",
+        purchasePrice: roundCurrency(item.purchasePrice),
+        taxType: normalizeTaxType(item.taxType),
+      })),
+      purchaseOrders: (category.purchaseOrders || []).map((order) => enrichPurchaseOrder(order, category.items || [])),
       users: (category.users || []).map((user) => migrateUser(user)),
       pushSubscriptions: category.pushSubscriptions || [],
       lastLowStockSignature: category.lastLowStockSignature || "",
@@ -903,7 +1003,7 @@ function getPublicVapidKey(store) {
 function computeLowStockSignature(category) {
   return (category.items || [])
     .filter((item) => item.currentStock <= item.parStock)
-    .map((item) => `${item.id}:${item.currentStock}`)
+    .map((item) => `${item.id}:${item.currentStock}:${roundCurrency(item.purchasePrice)}:${normalizeTaxType(item.taxType)}`)
     .sort()
     .join("|");
 }
@@ -915,9 +1015,20 @@ async function maybeSendLowStockPush(store, category, previousSignature) {
   }
 
   const lowStockItems = category.items.filter((item) => item.currentStock <= item.parStock);
+  const lowStockTotals = lowStockItems.reduce(
+    (totals, item) => {
+      const shortage = Math.max(0, number(item.parStock) - number(item.currentStock));
+      const breakdown = calculateFinancialTotals(shortage * number(item.purchasePrice), item.taxType);
+      totals.totalAmount += breakdown.totalAmount;
+      totals.supplyAmount += breakdown.supplyAmount;
+      totals.vatAmount += breakdown.vatAmount;
+      return totals;
+    },
+    { totalAmount: 0, supplyAmount: 0, vatAmount: 0 },
+  );
   const payload = JSON.stringify({
     title: `${category.name} 재고 경고`,
-    body: `${lowStockItems.map((item) => item.name).join(", ")} 기준 재고 이하`,
+    body: `${lowStockItems.map((item) => item.name).join(", ")} 기준 재고 이하 · 예상 ${roundCurrency(lowStockTotals.totalAmount)}원`,
     url: "/",
     categoryId: category.id,
   });
@@ -1022,11 +1133,21 @@ function importInventoryRows(category, rows) {
     const row = normalizeInventoryImportRow(rawRow, index);
     const existingItem =
       (row.id ? findById(category.items, row.id) : null) ||
+      (row.productCode
+        ? category.items.find((item) => String(item.productCode || "").trim() === row.productCode)
+        : null) ||
       category.items.find((item) => normalizeToken(item.name) === normalizeToken(row.name));
 
     if (existingItem) {
+      existingItem.productCode = row.productCode || "";
       existingItem.name = row.name;
+      existingItem.category = normalizeItemCategory(row.category);
       existingItem.unit = row.unit;
+      existingItem.origin = row.origin || "";
+      existingItem.storageType = row.storageType || "";
+      existingItem.storageLocation = row.storageLocation || "";
+      existingItem.purchasePrice = roundCurrency(row.purchasePrice);
+      existingItem.taxType = normalizeTaxType(row.taxType);
       existingItem.currentStock = row.currentStock;
       existingItem.parStock = row.parStock;
       summary.updated += 1;
@@ -1035,8 +1156,15 @@ function importInventoryRows(category, rows) {
 
     category.items.unshift({
       id: crypto.randomUUID(),
+      productCode: row.productCode || "",
       name: row.name,
+      category: normalizeItemCategory(row.category),
       unit: row.unit,
+      origin: row.origin || "",
+      storageType: row.storageType || "",
+      storageLocation: row.storageLocation || "",
+      purchasePrice: roundCurrency(row.purchasePrice),
+      taxType: normalizeTaxType(row.taxType),
       currentStock: row.currentStock,
       parStock: row.parStock,
     });
@@ -1057,8 +1185,15 @@ function normalizeInventoryImportRow(rawRow, index) {
 
   return {
     id: String(row.id || "").trim(),
+    productCode: String(row.productCode || "").trim(),
     name,
+    category: normalizeItemCategory(row.category),
     unit,
+    origin: String(row.origin || "").trim(),
+    storageType: String(row.storageType || "").trim(),
+    storageLocation: String(row.storageLocation || "").trim(),
+    purchasePrice: roundCurrency(row.purchasePrice),
+    taxType: normalizeTaxType(row.taxType),
     currentStock: round(number(row.currentStock)),
     parStock: round(number(row.parStock)),
   };
@@ -1219,25 +1354,55 @@ function normalizeToken(value) {
     .replace(/[()\-_/]/g, "");
 }
 
+function normalizeItemCategory(value) {
+  return String(value || "").trim() || "미분류";
+}
+
 function buildInventoryCsv(category) {
   const headers = [
-    "카테고리",
+    "매장카테고리",
+    "상품코드",
     "품목명",
+    "카테고리",
+    "원산지",
+    "입수량",
+    "과세구분",
+    "보관방법",
+    "보관위치",
+    "구매금액",
+    "공급가액",
+    "부가세",
     "현재재고",
     "기준재고",
-    "단위",
     "부족수량",
+    "부족예상금액",
+    "부족예상공급가액",
+    "부족예상부가세",
     "상태",
   ];
   const rows = (category.items || []).map((item) => {
     const shortage = round(Math.max(0, item.parStock - item.currentStock));
+    const itemTotals = calculateFinancialTotals(item.purchasePrice, item.taxType);
+    const shortageTotals = calculateFinancialTotals(shortage * number(item.purchasePrice), item.taxType);
     return [
       category.name,
+      item.productCode || "",
       item.name,
+      normalizeItemCategory(item.category),
+      item.origin || "",
+      item.unit,
+      formatTaxType(item.taxType),
+      item.storageType || "",
+      item.storageLocation || "",
+      roundCurrency(item.purchasePrice),
+      itemTotals.supplyAmount,
+      itemTotals.vatAmount,
       item.currentStock,
       item.parStock,
-      item.unit,
       shortage,
+      shortageTotals.totalAmount,
+      shortageTotals.supplyAmount,
+      shortageTotals.vatAmount,
       shortage > 0 ? "경고" : "정상",
     ];
   });
@@ -1250,4 +1415,67 @@ function buildInventoryCsv(category) {
 function escapeCsvCell(value) {
   const text = String(value ?? "");
   return /[",\n]/.test(text) ? `"${text.replace(/"/g, "\"\"")}"` : text;
+}
+
+function enrichPurchaseOrder(order, items) {
+  const item = findById(items, order.itemId);
+  const baseItem = {
+    purchasePrice: order.unitPrice ?? item?.purchasePrice ?? 0,
+    taxType: order.taxType || item?.taxType || "taxable",
+  };
+  const totals = calculateOrderAmounts(baseItem, order.quantity);
+
+  return {
+    ...order,
+    taxType: normalizeTaxType(order.taxType || totals.taxType),
+    unitPrice: roundCurrency(order.unitPrice ?? totals.unitPrice),
+    totalAmount: roundCurrency(order.totalAmount ?? totals.totalAmount),
+    supplyAmount: roundCurrency(order.supplyAmount ?? totals.supplyAmount),
+    vatAmount: roundCurrency(order.vatAmount ?? totals.vatAmount),
+  };
+}
+
+function calculateOrderAmounts(item, quantity) {
+  const unitPrice = roundCurrency(item.purchasePrice);
+  const totalAmount = roundCurrency(number(quantity) * unitPrice);
+  const totals = calculateFinancialTotals(totalAmount, item.taxType);
+  return {
+    unitPrice,
+    taxType: normalizeTaxType(item.taxType),
+    ...totals,
+  };
+}
+
+function calculateFinancialTotals(totalAmount, taxType) {
+  const normalizedTotal = roundCurrency(totalAmount);
+  if (normalizeTaxType(taxType) === "exempt") {
+    return {
+      totalAmount: normalizedTotal,
+      supplyAmount: normalizedTotal,
+      vatAmount: 0,
+    };
+  }
+
+  const supplyAmount = roundCurrency(normalizedTotal / 1.1);
+  return {
+    totalAmount: normalizedTotal,
+    supplyAmount,
+    vatAmount: normalizedTotal - supplyAmount,
+  };
+}
+
+function normalizeTaxType(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (["면세", "exempt", "free", "non-tax", "nontax"].includes(normalized)) {
+    return "exempt";
+  }
+  return "taxable";
+}
+
+function formatTaxType(value) {
+  return normalizeTaxType(value) === "exempt" ? "면세" : "과세";
+}
+
+function roundCurrency(value) {
+  return Math.round(number(value));
 }

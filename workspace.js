@@ -1,8 +1,16 @@
 const CLIENT_STORAGE_KEY = "shop-n-shop-client-v1";
 const INVENTORY_IMPORT_ALIASES = {
   id: ["id", "품목id", "itemid"],
-  name: ["품목명", "품목", "name", "itemname", "item"],
+  productCode: ["상품코드", "품목코드", "productcode", "code"],
+  name: ["품목명", "상품명", "품목", "name", "itemname", "productname", "item"],
+  category: ["카테고리", "category"],
   unit: ["단위", "unit"],
+  quantityUnit: ["입수량", "quantityunit", "packunit"],
+  origin: ["원산지", "origin"],
+  storageType: ["보관방법", "보관방식", "storagetype", "storagemethod"],
+  storageLocation: ["보관위치", "위치", "storagelocation", "location"],
+  purchasePrice: ["구매금액", "금액", "총금액", "purchaseprice", "price", "amount", "totalamount"],
+  taxType: ["과세구분", "과/면세", "과세", "면세", "taxtype", "taxstatus", "taxcategory"],
   currentStock: ["현재재고", "현재수량", "재고", "currentstock", "stock", "quantity"],
   parStock: ["기준재고", "최소재고", "안전재고", "parstock", "minstock", "safetystock"],
 };
@@ -22,6 +30,7 @@ const state = {
   serviceWorkerRegistration: null,
   inventorySearch: "",
   inventoryStatusFilter: "all",
+  inventoryCategoryFilter: clientState.inventoryCategoryFilter || "all",
 };
 
 const elements = {
@@ -49,9 +58,15 @@ const elements = {
   itemSubmitButton: document.querySelector("#itemSubmitButton"),
   inventoryImportFile: document.querySelector("#inventoryImportFile"),
   inventoryImportButton: document.querySelector("#inventoryImportButton"),
+  inventoryCategoryTabs: document.querySelector("#inventoryCategoryTabs"),
+  inventoryCategoryNotice: document.querySelector("#inventoryCategoryNotice"),
+  renameCategoryButton: document.querySelector("#renameCategoryButton"),
+  deleteCategoryButton: document.querySelector("#deleteCategoryButton"),
   vendorForm: document.querySelector("#vendorForm"),
   userForm: document.querySelector("#userForm"),
   purchaseForm: document.querySelector("#purchaseForm"),
+  purchaseEstimateCard: document.querySelector("#purchaseEstimateCard"),
+  orderSummaryCard: document.querySelector("#orderSummaryCard"),
   receiptForm: document.querySelector("#receiptForm"),
   receiptUploadForm: document.querySelector("#receiptUploadForm"),
   resetRecipeFormButton: document.querySelector("#resetRecipeFormButton"),
@@ -100,9 +115,14 @@ function bindEvents() {
   elements.itemForm.addEventListener("submit", handleItemSubmit);
   elements.resetItemFormButton.addEventListener("click", resetItemForm);
   elements.inventoryImportButton.addEventListener("click", handleInventoryImport);
+  elements.inventoryCategoryTabs.addEventListener("click", handleInventoryCategoryTabClick);
+  elements.renameCategoryButton.addEventListener("click", handleRenameCategory);
+  elements.deleteCategoryButton.addEventListener("click", handleDeleteCategory);
   elements.vendorForm.addEventListener("submit", handleVendorSubmit);
   elements.userForm.addEventListener("submit", handleUserSubmit);
   elements.purchaseForm.addEventListener("submit", handlePurchaseSubmit);
+  elements.purchaseForm.addEventListener("input", handlePurchaseEstimateChange);
+  elements.purchaseForm.addEventListener("change", handlePurchaseEstimateChange);
   elements.receiptForm.addEventListener("submit", handleReceiptSubmit);
   elements.receiptUploadForm.addEventListener("submit", suppressSubmit);
   elements.resetRecipeFormButton.addEventListener("click", resetRecipeForm);
@@ -205,8 +225,10 @@ function renderWorkspace() {
     return;
   }
 
+  syncInventoryCategoryFilter(category);
   renderWorkspaceStats(category);
   renderInventoryTable(category);
+  renderInventoryCategoryTabs(category);
   renderItemList(category);
   renderVendorList(category);
   renderUserSection(category, user);
@@ -233,6 +255,7 @@ function renderWorkspaceStats(category) {
   const lowStockItems = getLowStockItems(category);
   const todaysClosings = (category.receiptUploads || []).filter((entry) => toDateKey(entry.createdAt) === getTodayDateKey());
   const openOrders = category.purchaseOrders.filter((order) => order.status !== "received");
+  const lowStockCost = getLowStockFinancialTotals(category);
 
   elements.metricItems.textContent = String(category.items.length);
   elements.metricLowStock.textContent = String(lowStockItems.length);
@@ -249,7 +272,7 @@ function renderWorkspaceStats(category) {
 
   const names = lowStockItems.map((item) => item.name).join(", ");
   elements.workspaceAlert.classList.remove("hidden");
-  elements.workspaceAlert.textContent = `${names} 품목이 기준 재고 이하입니다. 발주 검토가 필요합니다.`;
+  elements.workspaceAlert.textContent = `${names} 품목이 기준 재고 이하입니다. 예상 발주액 ${formatCurrency(lowStockCost.totalAmount)}원, 공급가액 ${formatCurrency(lowStockCost.supplyAmount)}원, 부가세 ${formatCurrency(lowStockCost.vatAmount)}원입니다.`;
   triggerAlertsIfNeeded(category, lowStockItems);
 }
 
@@ -269,6 +292,8 @@ function renderInventoryTable(category) {
           return `
             <tr class="${shortage > 0 ? "low-stock" : ""}">
               <td>${item.name}</td>
+              <td>${item.storageType || "-"}</td>
+              <td>${item.storageLocation || "-"}</td>
               <td>${formatQuantity(item.currentStock)} ${item.unit}</td>
               <td>${formatQuantity(item.parStock)} ${item.unit}</td>
               <td>${formatQuantity(shortage)} ${item.unit}</td>
@@ -277,41 +302,51 @@ function renderInventoryTable(category) {
           `;
         })
         .join("")
-    : '<tr><td colspan="5">품목을 먼저 등록하세요.</td></tr>';
+    : '<tr><td colspan="7">품목을 먼저 등록하세요.</td></tr>';
 }
 
 function renderItemList(category) {
   const items = getVisibleItems(category);
   if (!items.length) {
-    elements.itemList.innerHTML = '<div class="erp-grid-empty">품목을 먼저 등록하세요.</div>';
+    elements.itemList.innerHTML = '<tr><td colspan="6">품목을 먼저 등록하세요.</td></tr>';
     return;
   }
 
   elements.itemList.innerHTML = items
     .map((item) => {
-      const shortage = roundNumber(Math.max(0, item.parStock - item.currentStock));
-      const status =
-        item.currentStock <= 0
-          ? '<span class="status-chip status-danger">품절</span>'
-          : shortage > 0
-            ? '<span class="status-chip status-warning">부족</span>'
-            : '<span class="status-chip">정상</span>';
-
       return `
-        <div class="erp-grid-row">
-          <strong>${item.name}</strong>
-          <span>${formatQuantity(item.currentStock)}</span>
-          <span>${formatQuantity(item.parStock)}</span>
-          <span>${item.unit}</span>
-          <span>${status}</span>
-          <div class="row-actions">
-            <button class="secondary-button compact-button" type="button" data-action="edit-item" data-id="${item.id}">수정</button>
-            <button class="secondary-button compact-button danger-button" type="button" data-action="delete-item" data-id="${item.id}">삭제</button>
-          </div>
-        </div>
+        <tr>
+          <td>${escapeHtml(item.productCode || "-")}</td>
+          <td>${escapeHtml(item.name)}</td>
+          <td>${formatTaxType(item.taxType)}</td>
+          <td>${escapeHtml(item.unit || "-")}</td>
+          <td>${escapeHtml(item.origin || "-")}</td>
+          <td>
+            <div class="row-actions">
+              <button class="secondary-button compact-button" type="button" data-action="edit-item" data-id="${item.id}">수정</button>
+              <button class="secondary-button compact-button danger-button" type="button" data-action="delete-item" data-id="${item.id}">삭제</button>
+            </div>
+          </td>
+        </tr>
       `;
     })
     .join("");
+}
+
+function renderInventoryCategoryTabs(category) {
+  const categories = getInventoryCategories(category);
+  elements.inventoryCategoryTabs.innerHTML = categories
+    .map((entry) => {
+      const activeClass = entry.value === state.inventoryCategoryFilter ? " active" : "";
+      return `<button type="button" class="category-tab${activeClass}" data-category="${escapeHtml(entry.value)}">${escapeHtml(entry.label)}</button>`;
+    })
+    .join("");
+
+  const activeCategory = state.inventoryCategoryFilter === "all" ? "전체" : state.inventoryCategoryFilter;
+  elements.inventoryCategoryNotice.textContent = `${activeCategory} 카테고리 ${getVisibleItems(category).length}개 품목 표시 중`;
+  const disabled = state.inventoryCategoryFilter === "all";
+  elements.renameCategoryButton.disabled = disabled;
+  elements.deleteCategoryButton.disabled = disabled;
 }
 
 function renderVendorList(category) {
@@ -370,10 +405,11 @@ function renderOrderForms(category) {
         .map((order) => {
           const item = findById(category.items, order.itemId);
           const vendor = findById(category.vendors, order.vendorId);
-          return `<option value="${order.id}">${item?.name ?? "삭제된 품목"} / ${formatQuantity(order.quantity)} / ${vendor?.name ?? "삭제된 거래처"}</option>`;
+          return `<option value="${order.id}">${item?.name ?? "삭제된 품목"} / ${formatQuantity(order.quantity)} / ${vendor?.name ?? "삭제된 거래처"} / ${formatCurrency(order.totalAmount || 0)}원</option>`;
         })
         .join("")
     : '<option value="">처리할 발주가 없습니다</option>';
+  renderPurchaseEstimate();
 }
 
 function buildItemOptions(items) {
@@ -388,6 +424,13 @@ function buildItemOptions(items) {
 }
 
 function renderOrderList(category) {
+  const openSummary = summarizeOrders(category.purchaseOrders.filter((order) => order.status !== "received"));
+  elements.orderSummaryCard.innerHTML = [
+    `<strong>미입고 발주 합계 ${formatCurrency(openSummary.totalAmount)}원</strong>`,
+    `<div class="summary-line">공급가액 ${formatCurrency(openSummary.supplyAmount)}원 · 부가세 ${formatCurrency(openSummary.vatAmount)}원</div>`,
+    `<div class="summary-line">발주 ${openSummary.count}건</div>`,
+  ].join("");
+
   renderList(
     elements.purchaseList,
     category.purchaseOrders.map((order) => {
@@ -401,7 +444,7 @@ function renderOrderList(category) {
       return `
         <li class="activity-item">
           <p class="activity-title">${item?.name ?? "삭제된 품목"} ${formatQuantity(order.quantity)} ${item?.unit ?? ""}</p>
-          <p class="activity-meta">${vendor?.name ?? "삭제된 거래처"} · ${statusLabel} · ${formatDateTime(order.createdAt)}</p>
+          <p class="activity-meta">${vendor?.name ?? "삭제된 거래처"} · ${statusLabel} · ${formatTaxType(order.taxType)} · 총액 ${formatCurrency(order.totalAmount || 0)}원 · 공급가액 ${formatCurrency(order.supplyAmount || 0)}원 · 부가세 ${formatCurrency(order.vatAmount || 0)}원 · ${formatDateTime(order.createdAt)}</p>
         </li>
       `;
     }),
@@ -570,8 +613,15 @@ async function handleItemSubmit(event) {
   const formData = new FormData(event.currentTarget);
   await mutateWorkspace("/api/items", {
     id: String(formData.get("id") || "").trim(),
+    productCode: String(formData.get("productCode") || "").trim(),
     name: String(formData.get("name")).trim(),
+    category: String(formData.get("category") || "").trim(),
     unit: String(formData.get("unit")).trim(),
+    origin: String(formData.get("origin") || "").trim(),
+    storageType: String(formData.get("storageType") || "").trim(),
+    storageLocation: String(formData.get("storageLocation") || "").trim(),
+    purchasePrice: Number(formData.get("purchasePrice") || 0),
+    taxType: normalizeTaxType(String(formData.get("taxType") || "taxable")),
     currentStock: Number(formData.get("currentStock")),
     parStock: Number(formData.get("parStock")),
   });
@@ -625,9 +675,58 @@ async function handlePurchaseSubmit(event) {
       vendorId: String(formData.get("vendorId")),
     });
     event.currentTarget.reset();
+    renderPurchaseEstimate();
   } catch (error) {
     handleWorkspaceError(error, "발주 생성 중 오류가 발생했습니다.");
   }
+}
+
+function handlePurchaseEstimateChange() {
+  renderPurchaseEstimate();
+}
+
+function handleInventoryCategoryTabClick(event) {
+  const button = event.target.closest("[data-category]");
+  if (!button) {
+    return;
+  }
+  state.inventoryCategoryFilter = button.dataset.category;
+  persistClientState();
+  renderWorkspace();
+}
+
+async function handleRenameCategory() {
+  if (state.inventoryCategoryFilter === "all") {
+    return;
+  }
+  const nextName = window.prompt("새 카테고리 이름을 입력하세요.", state.inventoryCategoryFilter);
+  if (nextName === null) {
+    return;
+  }
+  const trimmed = nextName.trim();
+  if (!trimmed) {
+    window.alert("카테고리 이름을 입력하세요.");
+    return;
+  }
+  const previousName = state.inventoryCategoryFilter;
+  await mutateWorkspace("/api/item-categories/rename", { previousName, nextName: trimmed });
+  state.inventoryCategoryFilter = trimmed;
+  persistClientState();
+  renderWorkspace();
+}
+
+async function handleDeleteCategory() {
+  if (state.inventoryCategoryFilter === "all") {
+    return;
+  }
+  const categoryName = state.inventoryCategoryFilter;
+  if (!window.confirm(`'${categoryName}' 카테고리를 삭제하고 품목을 미분류로 이동할까요?`)) {
+    return;
+  }
+  await mutateWorkspace("/api/item-categories/delete", { categoryName });
+  state.inventoryCategoryFilter = "미분류";
+  persistClientState();
+  renderWorkspace();
 }
 
 async function handleReceiptSubmit(event) {
@@ -845,6 +944,7 @@ function handleWorkspaceError(error, fallbackMessage) {
     receipt_files_required: "영수증 파일을 한 개 이상 선택하세요.",
     ocr_empty_result: "영수증 이미지에서 읽어낸 텍스트가 없습니다.",
     import_rows_required: "엑셀 파일에서 반영할 재고 행을 찾지 못했습니다.",
+    category_name_required: "카테고리 이름을 입력하세요.",
   };
 
   window.alert(messageMap[error.message] || fallbackMessage);
@@ -1008,8 +1108,15 @@ function handleItemListAction(event) {
 function setItemFormValues(item = null) {
   elements.itemForm.reset();
   elements.itemForm.elements.id.value = item?.id || "";
+  elements.itemForm.elements.productCode.value = item?.productCode || "";
   elements.itemForm.elements.name.value = item?.name || "";
+  elements.itemForm.elements.category.value = item?.category || "";
   elements.itemForm.elements.unit.value = item?.unit || "";
+  elements.itemForm.elements.origin.value = item?.origin || "";
+  elements.itemForm.elements.storageType.value = item?.storageType || "";
+  elements.itemForm.elements.storageLocation.value = item?.storageLocation || "";
+  elements.itemForm.elements.purchasePrice.value = item ? item.purchasePrice || 0 : "";
+  elements.itemForm.elements.taxType.value = normalizeTaxType(item?.taxType || "taxable");
   elements.itemForm.elements.currentStock.value = item ? item.currentStock : "";
   elements.itemForm.elements.parStock.value = item ? item.parStock : "";
   elements.itemSubmitButton.textContent = item ? "품목 수정" : "품목 저장";
@@ -1180,13 +1287,37 @@ function normalizeInventoryImportRow(row, index) {
 
   const item = {
     id: String(getInventoryImportValue(normalizedRow, INVENTORY_IMPORT_ALIASES.id) || "").trim(),
+    productCode: String(getInventoryImportValue(normalizedRow, INVENTORY_IMPORT_ALIASES.productCode) || "").trim(),
     name: String(getInventoryImportValue(normalizedRow, INVENTORY_IMPORT_ALIASES.name) || "").trim(),
-    unit: String(getInventoryImportValue(normalizedRow, INVENTORY_IMPORT_ALIASES.unit) || "").trim(),
+    category: String(getInventoryImportValue(normalizedRow, INVENTORY_IMPORT_ALIASES.category) || "").trim(),
+    unit: String(
+      getInventoryImportValue(normalizedRow, INVENTORY_IMPORT_ALIASES.quantityUnit) ||
+        getInventoryImportValue(normalizedRow, INVENTORY_IMPORT_ALIASES.unit) ||
+        "",
+    ).trim(),
+    origin: String(getInventoryImportValue(normalizedRow, INVENTORY_IMPORT_ALIASES.origin) || "").trim(),
+    storageType: String(getInventoryImportValue(normalizedRow, INVENTORY_IMPORT_ALIASES.storageType) || "").trim(),
+    storageLocation: String(getInventoryImportValue(normalizedRow, INVENTORY_IMPORT_ALIASES.storageLocation) || "").trim(),
+    purchasePrice: parseInventoryImportNumber(getInventoryImportValue(normalizedRow, INVENTORY_IMPORT_ALIASES.purchasePrice)),
+    taxType: normalizeTaxType(getInventoryImportValue(normalizedRow, INVENTORY_IMPORT_ALIASES.taxType)),
     currentStock: parseInventoryImportNumber(getInventoryImportValue(normalizedRow, INVENTORY_IMPORT_ALIASES.currentStock)),
     parStock: parseInventoryImportNumber(getInventoryImportValue(normalizedRow, INVENTORY_IMPORT_ALIASES.parStock)),
   };
 
-  if (!item.id && !item.name && !item.unit && item.currentStock === 0 && item.parStock === 0) {
+  if (
+    !item.id &&
+    !item.productCode &&
+    !item.name &&
+    !item.category &&
+    !item.unit &&
+    !item.origin &&
+    !item.storageType &&
+    !item.storageLocation &&
+    item.purchasePrice === 0 &&
+    item.taxType === "taxable" &&
+    item.currentStock === 0 &&
+    item.parStock === 0
+  ) {
     return null;
   }
 
@@ -1223,16 +1354,21 @@ function normalizeImportHeader(value) {
 
 function buildKakaoMessage(category) {
   const lowStockLines = getLowStockItems(category)
-    .map((item) => `- ${item.name}: 현재 ${formatQuantity(item.currentStock)} ${item.unit} / 기준 ${formatQuantity(item.parStock)} ${item.unit}`)
+    .map((item) => {
+      const shortage = Math.max(0, item.parStock - item.currentStock);
+      const totals = calculateFinancialTotals(shortage * Number(item.purchasePrice || 0), item.taxType);
+      return `- ${item.name}: 현재 ${formatQuantity(item.currentStock)} ${item.unit} / 기준 ${formatQuantity(item.parStock)} ${item.unit} / 예상 ${formatCurrency(totals.totalAmount)}원`;
+    })
     .join("\n");
   const orderLines = category.purchaseOrders
     .filter((order) => order.status !== "received")
     .map((order) => {
       const item = findById(category.items, order.itemId);
       const vendor = findById(category.vendors, order.vendorId);
-      return `- ${item?.name ?? "삭제된 품목"} ${formatQuantity(order.quantity)} ${item?.unit ?? ""} / 거래처 ${vendor?.name ?? "미등록"}`;
+      return `- ${item?.name ?? "삭제된 품목"} ${formatQuantity(order.quantity)} ${item?.unit ?? ""} / 거래처 ${vendor?.name ?? "미등록"} / 총액 ${formatCurrency(order.totalAmount || 0)}원`;
     })
     .join("\n");
+  const openSummary = summarizeOrders(category.purchaseOrders.filter((order) => order.status !== "received"));
 
   return [
     `[발주 알림] ${category.kakaoConfig.senderName || "샵앤샵 평택1호점"} / ${category.name}`,
@@ -1243,6 +1379,7 @@ function buildKakaoMessage(category) {
     "",
     "미입고 발주 현황",
     orderLines || "- 없음",
+    `미입고 발주 합계: 총액 ${formatCurrency(openSummary.totalAmount)}원 / 공급가액 ${formatCurrency(openSummary.supplyAmount)}원 / 부가세 ${formatCurrency(openSummary.vatAmount)}원`,
     "",
     `메모: ${category.kakaoConfig.notes || "없음"}`,
     "",
@@ -1260,7 +1397,7 @@ function copyKakaoMessage() {
 
 function triggerAlertsIfNeeded(category, lowStockItems) {
   const signature = lowStockItems
-    .map((item) => `${item.id}:${item.currentStock}`)
+    .map((item) => `${item.id}:${item.currentStock}:${item.purchasePrice || 0}:${normalizeTaxType(item.taxType)}`)
     .sort()
     .join("|");
 
@@ -1271,9 +1408,10 @@ function triggerAlertsIfNeeded(category, lowStockItems) {
   state.lastAlarmSignatureByCategory[category.id] = signature;
   persistClientState();
   playAlarm();
+  const lowStockCost = getLowStockFinancialTotals(category);
   if (state.notificationEnabled && "Notification" in window && Notification.permission === "granted") {
     new Notification(`${category.name} 재고 경고`, {
-      body: `${lowStockItems.map((item) => item.name).join(", ")} 기준 재고 이하`,
+      body: `${lowStockItems.map((item) => item.name).join(", ")} 기준 재고 이하 · 예상 ${formatCurrency(lowStockCost.totalAmount)}원`,
     });
   }
 }
@@ -1309,7 +1447,15 @@ function getLowStockItems(category) {
 
 function getVisibleItems(category) {
   return (category.items || []).filter((item) => {
-    const matchesSearch = !state.inventorySearch || item.name.toLowerCase().includes(state.inventorySearch);
+    const matchesCategory =
+      state.inventoryCategoryFilter === "all" || getItemCategoryLabel(item) === state.inventoryCategoryFilter;
+    if (!matchesCategory) {
+      return false;
+    }
+    const matchesSearch =
+      !state.inventorySearch ||
+      item.name.toLowerCase().includes(state.inventorySearch) ||
+      String(item.productCode || "").toLowerCase().includes(state.inventorySearch);
     if (!matchesSearch) {
       return false;
     }
@@ -1321,6 +1467,25 @@ function getVisibleItems(category) {
     }
     return true;
   });
+}
+
+function syncInventoryCategoryFilter(category) {
+  const availableCategories = getInventoryCategories(category).map((entry) => entry.value);
+  if (!availableCategories.includes(state.inventoryCategoryFilter)) {
+    state.inventoryCategoryFilter = "all";
+    persistClientState();
+  }
+}
+
+function getInventoryCategories(category) {
+  const categoryNames = Array.from(new Set((category.items || []).map((item) => getItemCategoryLabel(item)))).sort(
+    (left, right) => left.localeCompare(right, "ko-KR"),
+  );
+  return [{ value: "all", label: "전체" }, ...categoryNames.map((name) => ({ value: name, label: name }))];
+}
+
+function getItemCategoryLabel(item) {
+  return String(item?.category || "").trim() || "미분류";
 }
 
 function getTodayDateKey() {
@@ -1360,6 +1525,101 @@ function roundNumber(value) {
   return Math.round(Number(value) * 100) / 100;
 }
 
+function renderPurchaseEstimate() {
+  const item = findById(state.workspaceCategory?.items || [], elements.purchaseForm.elements.itemId.value);
+  const quantity = Number(elements.purchaseForm.elements.quantity.value || 0);
+  if (!item || quantity <= 0) {
+    elements.purchaseEstimateCard.innerHTML = "품목과 수량을 선택하면 발주 예상 금액이 계산됩니다.";
+    return;
+  }
+
+  const estimate = calculateOrderAmount(item, quantity);
+  elements.purchaseEstimateCard.innerHTML = [
+    `<strong>이번 발주 예상 총액 ${formatCurrency(estimate.totalAmount)}원</strong>`,
+    `<div class="summary-line">공급가액 ${formatCurrency(estimate.supplyAmount)}원 · 부가세 ${formatCurrency(estimate.vatAmount)}원</div>`,
+    `<div class="summary-line">기준 단가 ${formatCurrency(item.purchasePrice || 0)}원 · ${formatTaxType(item.taxType)}</div>`,
+  ].join("");
+}
+
+function getLowStockFinancialTotals(category) {
+  return summarizeOrders(
+    getLowStockItems(category).map((item) => {
+      const shortage = Math.max(0, item.parStock - item.currentStock);
+      return calculateOrderAmount(item, shortage);
+    }),
+  );
+}
+
+function summarizeOrders(orders) {
+  return orders.reduce(
+    (totals, order) => {
+      totals.count += 1;
+      totals.totalAmount += Number(order.totalAmount || 0);
+      totals.supplyAmount += Number(order.supplyAmount || 0);
+      totals.vatAmount += Number(order.vatAmount || 0);
+      return totals;
+    },
+    { count: 0, totalAmount: 0, supplyAmount: 0, vatAmount: 0 },
+  );
+}
+
+function calculateOrderAmount(item, quantity) {
+  const totalAmount = roundCurrency(Number(quantity || 0) * Number(item?.purchasePrice || 0));
+  const totals = calculateFinancialTotals(totalAmount, item?.taxType);
+  return {
+    ...totals,
+    taxType: normalizeTaxType(item?.taxType || "taxable"),
+  };
+}
+
+function calculateFinancialTotals(totalAmount, taxType) {
+  const normalizedTotal = roundCurrency(totalAmount);
+  const normalizedTaxType = normalizeTaxType(taxType);
+  if (normalizedTaxType === "exempt") {
+    return {
+      totalAmount: normalizedTotal,
+      supplyAmount: normalizedTotal,
+      vatAmount: 0,
+    };
+  }
+
+  const supplyAmount = roundCurrency(normalizedTotal / 1.1);
+  return {
+    totalAmount: normalizedTotal,
+    supplyAmount,
+    vatAmount: normalizedTotal - supplyAmount,
+  };
+}
+
+function normalizeTaxType(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (["면세", "exempt", "free", "non-tax", "nontax"].includes(normalized)) {
+    return "exempt";
+  }
+  return "taxable";
+}
+
+function formatTaxType(value) {
+  return normalizeTaxType(value) === "exempt" ? "면세" : "과세";
+}
+
+function roundCurrency(value) {
+  return Math.round(Number(value) || 0);
+}
+
+function formatCurrency(value) {
+  return roundCurrency(value).toLocaleString("ko-KR");
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 function urlBase64ToUint8Array(base64String) {
   const padded = `${base64String}=`.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = padded.replace(/-/g, "+").replace(/_/g, "/");
@@ -1386,6 +1646,7 @@ function persistClientState() {
       selectedCategoryId: state.selectedCategoryId,
       activeTab: state.activeTab,
       authToken: state.authToken,
+      inventoryCategoryFilter: state.inventoryCategoryFilter,
       notificationEnabled: state.notificationEnabled,
       pushSubscribedByCategory: state.pushSubscribedByCategory,
       lastAlarmSignatureByCategory: state.lastAlarmSignatureByCategory,

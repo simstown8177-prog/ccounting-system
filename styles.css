@@ -556,6 +556,33 @@ h3 {
   border-top: 1px solid var(--border);
 }
 
+.category-tabs-wrap {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.category-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.category-tab {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--muted);
+}
+
+.category-tab.active {
+  border-color: rgba(37, 99, 235, 0.3);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
 label {
   display: grid;
   gap: 8px;
@@ -672,7 +699,7 @@ tbody tr.low-stock {
 .erp-grid-header,
 .erp-grid-row {
   display: grid;
-  grid-template-columns: 1.6fr 0.8fr 0.8fr 0.7fr 0.9fr 160px;
+  grid-template-columns: 1.2fr 0.9fr 1fr 0.95fr 0.8fr 0.8fr 0.8fr 0.7fr 0.9fr 160px;
   gap: 12px;
   align-items: center;
   padding: 12px 14px;
@@ -1013,7 +1040,7 @@ tbody tr.low-stock {
 
   .erp-grid-header,
   .erp-grid-row {
-    min-width: 760px;
+    min-width: 1100px;
   }
 
   th,
