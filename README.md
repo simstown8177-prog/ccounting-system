@@ -79,7 +79,7 @@ cd android
 - `DATABASE_URL`: Render free 배포용 외부 Postgres 연결 문자열
 - `DATABASE_IP_FAMILY`: 기본 권장값 `4`, Render에서 IPv6 경로 오류가 날 때 IPv4 우선 연결
 - `DATABASE_SSL_REJECT_UNAUTHORIZED`: 기본 권장값 `false`, 외부 관리형 Postgres SSL 인증서 검증 완화 여부
-- `APP_DOWNLOAD_URL`: 웹앱 상단에 노출할 Android APK 다운로드 주소
+- `APP_DOWNLOAD_URL`: 웹앱 기본 APK 대신 외부 고정 URL을 노출하고 싶을 때 쓰는 선택 환경변수
 
 브라우저 푸시 알림은 `localhost`에서는 바로 테스트할 수 있고, 외부 배포 환경에서는 보통
 `https`가 필요합니다.
@@ -122,4 +122,5 @@ cd android
 - 현재 저장소는 `Postgres 우선 + SQLite fallback` 기준으로 배포 가능한 상태입니다.
 - Render에서 `connect ENETUNREACH ... :5432`가 뜨면 서비스 환경변수에 `DATABASE_IP_FAMILY=4`를 추가한 뒤 다시 배포합니다.
 - 같은 오류가 계속 나면 현재 `DATABASE_URL` 호스트가 IPv6-only 주소인지 확인하고, DB 제공업체의 IPv4 지원 엔드포인트나 pooler URL로 교체해야 합니다.
-- Android 앱 다운로드 버튼을 운영 웹앱에 항상 보이게 하려면 Render 환경변수 `APP_DOWNLOAD_URL`에 실제 APK 공개 주소를 넣어야 합니다.
+- 현재 저장소의 `downloads/shopnshop-release.apk`가 배포에 포함되면 웹앱 상단 다운로드 버튼이 기본으로 노출됩니다.
+- 별도 저장소나 CDN 주소를 쓰고 싶을 때만 Render 환경변수 `APP_DOWNLOAD_URL`에 실제 APK 공개 주소를 넣으면 됩니다.

@@ -14,8 +14,18 @@ const DB_PATH = process.env.DB_PATH || path.join(DATA_DIR, "app.db");
 const DATABASE_URL = process.env.DATABASE_URL || "";
 const SERVER_STARTED_AT = new Date().toISOString();
 const APP_DOWNLOAD_URL = process.env.APP_DOWNLOAD_URL || "";
-const RELEASE_APK_PATH = path.join(ROOT, "android", "app", "build", "outputs", "apk", "release", "app-release.apk");
 const RELEASE_APK_DOWNLOAD_PATH = "/downloads/shopnshop-release.apk";
+const REPO_RELEASE_APK_PATH = path.join(ROOT, "downloads", "shopnshop-release.apk");
+const LOCAL_RELEASE_APK_PATH = path.join(
+  ROOT,
+  "android",
+  "app",
+  "build",
+  "outputs",
+  "apk",
+  "release",
+  "app-release.apk",
+);
 
 const CATEGORY_DEFINITIONS = [
   { id: "pizza-cheese-bbal", name: "피자는치즈빨", description: "피자 브랜드 운영 공간" },
@@ -862,20 +872,21 @@ async function serveStatic(req, res) {
 }
 
 function serveReleaseApk(res) {
-  if (!fs.existsSync(RELEASE_APK_PATH)) {
+  const filePath = resolveReleaseApkPath();
+  if (!filePath) {
     res.writeHead(404);
     res.end("Release APK not found");
     return;
   }
 
-  const stat = fs.statSync(RELEASE_APK_PATH);
+  const stat = fs.statSync(filePath);
   res.writeHead(200, {
     "Content-Type": "application/vnd.android.package-archive",
     "Content-Length": stat.size,
     "Content-Disposition": 'attachment; filename="shopnshop-release.apk"',
     "Cache-Control": "no-cache",
   });
-  fs.createReadStream(RELEASE_APK_PATH).pipe(res);
+  fs.createReadStream(filePath).pipe(res);
 }
 
 function getAppDownloadConfig() {
@@ -889,11 +900,23 @@ function getAppDownloadConfig() {
   }
 
   return {
-    available: fs.existsSync(RELEASE_APK_PATH),
+    available: Boolean(resolveReleaseApkPath()),
     url: RELEASE_APK_DOWNLOAD_PATH,
     filename: "shopnshop-release.apk",
     external: false,
   };
+}
+
+function resolveReleaseApkPath() {
+  if (fs.existsSync(REPO_RELEASE_APK_PATH)) {
+    return REPO_RELEASE_APK_PATH;
+  }
+
+  if (fs.existsSync(LOCAL_RELEASE_APK_PATH)) {
+    return LOCAL_RELEASE_APK_PATH;
+  }
+
+  return null;
 }
 
 function toPublicCategory(category) {
