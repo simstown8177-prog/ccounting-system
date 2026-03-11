@@ -13,6 +13,8 @@ const STORE_PATH = path.join(DATA_DIR, "store.json");
 const DB_PATH = process.env.DB_PATH || path.join(DATA_DIR, "app.db");
 const DATABASE_URL = process.env.DATABASE_URL || "";
 const SERVER_STARTED_AT = new Date().toISOString();
+const RELEASE_APK_PATH = path.join(ROOT, "android", "app", "build", "outputs", "apk", "release", "app-release.apk");
+const RELEASE_APK_DOWNLOAD_PATH = "/downloads/shopnshop-release.apk";
 
 const CATEGORY_DEFINITIONS = [
   { id: "pizza-cheese-bbal", name: "피자는치즈빨", description: "피자 브랜드 운영 공간" },
@@ -75,6 +77,11 @@ async function handleApi(req, res) {
       categories: store.categories.map(toPublicCategory),
       notificationSupported: true,
       pushPublicKey: getPublicVapidKey(store),
+      appDownload: {
+        available: fs.existsSync(RELEASE_APK_PATH),
+        url: RELEASE_APK_DOWNLOAD_PATH,
+        filename: "shopnshop-release.apk",
+      },
     });
   }
 
@@ -822,6 +829,11 @@ function createPurchaseOrder(itemId, vendorId, quantity, status, receivedQuantit
 
 async function serveStatic(req, res) {
   const { pathname } = new URL(req.url, `http://${req.headers.host}`);
+
+  if (pathname === RELEASE_APK_DOWNLOAD_PATH) {
+    return serveReleaseApk(res);
+  }
+
   const relativePath = pathname === "/" ? "index.html" : path.normalize(pathname).replace(/^[/\\]+/, "");
   const filePath = path.join(ROOT, relativePath);
 
@@ -849,6 +861,23 @@ async function serveStatic(req, res) {
 
   res.writeHead(200, { "Content-Type": types[ext] || "application/octet-stream" });
   fs.createReadStream(filePath).pipe(res);
+}
+
+function serveReleaseApk(res) {
+  if (!fs.existsSync(RELEASE_APK_PATH)) {
+    res.writeHead(404);
+    res.end("Release APK not found");
+    return;
+  }
+
+  const stat = fs.statSync(RELEASE_APK_PATH);
+  res.writeHead(200, {
+    "Content-Type": "application/vnd.android.package-archive",
+    "Content-Length": stat.size,
+    "Content-Disposition": 'attachment; filename="shopnshop-release.apk"',
+    "Cache-Control": "no-cache",
+  });
+  fs.createReadStream(RELEASE_APK_PATH).pipe(res);
 }
 
 function toPublicCategory(category) {

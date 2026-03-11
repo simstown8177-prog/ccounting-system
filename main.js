@@ -3,12 +3,14 @@ const CLIENT_STORAGE_KEY = "shop-n-shop-client-v1";
 const state = {
   categories: [],
   selectedCategoryId: readClientState().selectedCategoryId || null,
+  appDownload: null,
 };
 
 const elements = {
   categoryGrid: document.querySelector("#categoryGrid"),
   globalStats: document.querySelector("#globalStats"),
   selectedCategorySummary: document.querySelector("#selectedCategorySummary"),
+  appDownloadPanel: document.querySelector("#appDownloadPanel"),
   goLoginButton: document.querySelector("#goLoginButton"),
   seedDataButton: document.querySelector("#seedDataButton"),
 };
@@ -35,12 +37,36 @@ async function loadBootstrap() {
   const response = await fetch("/api/bootstrap");
   const payload = await response.json();
   state.categories = payload.categories || [];
+  state.appDownload = payload.appDownload || null;
 }
 
 function render() {
   renderGlobalStats();
+  renderAppDownloadPanel();
   renderCategoryGrid();
   renderSelectedCategorySummary();
+}
+
+function renderAppDownloadPanel() {
+  const appDownload = state.appDownload;
+  if (!appDownload?.available) {
+    elements.appDownloadPanel.hidden = true;
+    elements.appDownloadPanel.innerHTML = "";
+    return;
+  }
+
+  elements.appDownloadPanel.hidden = false;
+  elements.appDownloadPanel.innerHTML = `
+    <div class="download-panel-copy">
+      <strong>안드로이드 앱 설치</strong>
+      <p class="helper-text">
+        폰에서 APK를 내려받아 직접 설치할 수 있습니다. 설치가 막히면 "알 수 없는 앱 설치 허용"을 켜세요.
+      </p>
+    </div>
+    <a class="primary-button" href="${appDownload.url}" download="${appDownload.filename}">
+      Android 앱 다운로드
+    </a>
+  `;
 }
 
 function renderGlobalStats() {
