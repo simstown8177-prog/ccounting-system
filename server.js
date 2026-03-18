@@ -1227,12 +1227,16 @@ function importInventoryRows(category, rows) {
 
   rows.forEach((rawRow, index) => {
     const row = normalizeInventoryImportRow(rawRow, index);
-    const existingItem =
-      (row.id ? findById(category.items, row.id) : null) ||
-      (row.productCode
-        ? category.items.find((item) => String(item.productCode || "").trim() === row.productCode)
-        : null) ||
-      category.items.find((item) => normalizeToken(item.name) === normalizeToken(row.name));
+    const existingIndex = category.items.findIndex((item) => {
+      if (row.id && item.id === row.id) {
+        return true;
+      }
+      if (row.productCode && String(item.productCode || "").trim() === row.productCode) {
+        return true;
+      }
+      return normalizeToken(item.name) === normalizeToken(row.name);
+    });
+    const existingItem = existingIndex >= 0 ? category.items[existingIndex] : null;
 
     if (existingItem) {
       existingItem.productCode = row.productCode || "";
@@ -1247,6 +1251,10 @@ function importInventoryRows(category, rows) {
       existingItem.currentStock = row.currentStock;
       existingItem.parStock = row.parStock;
       existingItem.isPriority = Boolean(existingItem.isPriority);
+      if (existingIndex > 0) {
+        category.items.splice(existingIndex, 1);
+        category.items.unshift(existingItem);
+      }
       summary.updated += 1;
       return;
     }
