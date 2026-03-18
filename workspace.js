@@ -1025,7 +1025,18 @@ function handleWorkspaceError(error, fallbackMessage) {
     category_name_required: "카테고리 이름을 입력하세요.",
   };
 
-  window.alert(messageMap[error.message] || fallbackMessage);
+  const resolvedMessage = messageMap[error.message];
+  if (resolvedMessage) {
+    window.alert(resolvedMessage);
+    return;
+  }
+
+  if (typeof error.message === "string" && error.message.trim() && error.message !== fallbackMessage) {
+    window.alert(fallbackMessage + "\n" + error.message);
+    return;
+  }
+
+  window.alert(fallbackMessage);
 }
 
 function handleInventorySearch(event) {
