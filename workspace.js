@@ -1388,6 +1388,15 @@ async function handleInventoryImport() {
     }
 
     const response = await mutateWorkspace("/api/items/import", { rows });
+    state.activeTab = "items";
+    state.inventorySearch = "";
+    state.inventoryStatusFilter = "all";
+    state.inventoryCategoryFilter = "all";
+    elements.inventorySearchInput.value = "";
+    elements.inventoryStatusFilter.value = "all";
+    persistClientState();
+    syncTabState();
+    renderWorkspace();
     resetItemForm();
     elements.inventoryImportFile.value = "";
     const summary = response.importSummary || {};
