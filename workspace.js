@@ -2,19 +2,19 @@ const CLIENT_STORAGE_KEY = "shop-n-shop-client-v1";
 const XLSX_CDN_URL = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
 const TESSERACT_CDN_URL = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
 const INVENTORY_IMPORT_ALIASES = {
-  id: ["id", "품목id", "itemid"],
-  productCode: ["상품코드", "품목코드", "productcode", "code"],
-  name: ["품목명", "상품명", "품목", "name", "itemname", "productname", "item"],
+  id: ["id", "품목id", "itemid", "itemcode", "item_id"],
+  productCode: ["상품코드", "상품 코드", "품목코드", "품목 코드", "productcode", "product_code", "code"],
+  name: ["품목명", "품명", "상품명", "상품 명", "품목", "name", "itemname", "productname", "item"],
   category: ["카테고리", "category"],
-  unit: ["단위", "unit"],
-  quantityUnit: ["입수량", "quantityunit", "packunit"],
+  unit: ["단위", "단위명", "규격", "unit", "unitname"],
+  quantityUnit: ["입수량", "입수 수량", "수량단위", "수량 단위", "quantityunit", "quantity_unit", "packunit", "pack_unit"],
   origin: ["원산지", "origin"],
-  storageType: ["보관방법", "보관방식", "storagetype", "storagemethod"],
-  storageLocation: ["보관위치", "위치", "storagelocation", "location"],
-  purchasePrice: ["구매금액", "금액", "총금액", "purchaseprice", "price", "amount", "totalamount"],
-  taxType: ["과세구분", "과/면세", "과세", "면세", "taxtype", "taxstatus", "taxcategory"],
-  currentStock: ["현재재고", "현재수량", "재고", "currentstock", "stock", "quantity"],
-  parStock: ["기준재고", "최소재고", "안전재고", "parstock", "minstock", "safetystock"],
+  storageType: ["보관방법", "보관 방법", "보관방식", "보관 방식", "storagetype", "storagemethod"],
+  storageLocation: ["보관위치", "보관 위치", "위치", "storagelocation", "storage_location", "location"],
+  purchasePrice: ["구매금액", "구매 금액", "매입가", "금액", "총금액", "purchaseprice", "purchase_price", "price", "amount", "totalamount"],
+  taxType: ["과세구분", "과세 구분", "과/면세", "과세여부", "과세 여부", "과세", "면세", "taxtype", "taxstatus", "taxcategory"],
+  currentStock: ["현재재고", "현재 재고", "현재수량", "현재 수량", "재고", "currentstock", "current_stock", "stock", "quantity"],
+  parStock: ["기준재고", "기준 재고", "최소재고", "최소 재고", "안전재고", "안전 재고", "parstock", "par_stock", "minstock", "safetystock"],
 };
 
 const clientState = readClientState();
@@ -946,7 +946,7 @@ function handleWorkspaceError(error, fallbackMessage) {
 
   if (typeof error.message === "string" && error.message.startsWith("import_row_invalid:")) {
     const [, rowNumber] = error.message.split(":");
-    window.alert(`엑셀 업로드 ${rowNumber}행을 확인하세요. 품목명과 단위는 필수입니다.`);
+    window.alert(`엑셀 업로드 ${rowNumber}행을 확인하세요. 품목명과 단위(또는 입수량)는 필수입니다.`);
     return;
   }
 
@@ -1382,9 +1382,10 @@ function parseInventoryImportNumber(value) {
 
 function normalizeImportHeader(value) {
   return String(value || "")
+    .replace(/^\uFEFF/, "")
     .toLowerCase()
     .replace(/\s+/g, "")
-    .replace(/[()\-_/]/g, "");
+    .replace(/[()[\]\-_/.:]/g, "");
 }
 
 function buildKakaoMessage(category) {
