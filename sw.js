@@ -1,4 +1,4 @@
-const APP_SHELL_CACHE = "shopnshop-shell-v2";
+const APP_SHELL_CACHE = "shopnshop-shell-v3";
 const HTML_NAVIGATION_FALLBACKS = new Set(["/", "/index.html", "/login.html", "/workspace.html"]);
 const APP_SHELL_FILES = [
   "/",
@@ -14,6 +14,19 @@ const APP_SHELL_FILES = [
   "/icons/app-icon.svg",
   "/icons/app-icon-maskable.svg",
 ];
+const NETWORK_FIRST_FILES = new Set([
+  "/",
+  "/index.html",
+  "/login.html",
+  "/workspace.html",
+  "/styles.css",
+  "/main.js",
+  "/login.js",
+  "/workspace.js",
+  "/pwa.js",
+  "/manifest.webmanifest",
+  "/sw.js",
+]);
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -41,8 +54,9 @@ self.addEventListener("fetch", (event) => {
   }
 
   const isHtmlRequest = request.mode === "navigate" || HTML_NAVIGATION_FALLBACKS.has(url.pathname);
+  const isNetworkFirstRequest = isHtmlRequest || NETWORK_FIRST_FILES.has(url.pathname);
 
-  if (isHtmlRequest) {
+  if (isNetworkFirstRequest) {
     event.respondWith(
       fetch(request)
         .then((response) => {
@@ -53,7 +67,13 @@ self.addEventListener("fetch", (event) => {
         })
         .catch(async () => {
           const cached = await caches.match(request);
-          return cached || caches.match("/workspace.html") || caches.match("/index.html");
+          if (cached) {
+            return cached;
+          }
+          if (isHtmlRequest) {
+            return caches.match("/workspace.html") || caches.match("/index.html");
+          }
+          throw new Error("asset_unavailable");
         }),
     );
     return;

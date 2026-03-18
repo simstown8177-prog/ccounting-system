@@ -871,7 +871,12 @@ async function serveStatic(req, res) {
     ".webmanifest": "application/manifest+json; charset=utf-8",
   };
 
-  res.writeHead(200, { "Content-Type": types[ext] || "application/octet-stream" });
+  const headers = { "Content-Type": types[ext] || "application/octet-stream" };
+  if ([".html", ".js", ".css", ".webmanifest"].includes(ext) || pathname === "/sw.js") {
+    headers["Cache-Control"] = "no-cache";
+  }
+
+  res.writeHead(200, headers);
   fs.createReadStream(filePath).pipe(res);
 }
 
