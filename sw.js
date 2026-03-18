@@ -1,4 +1,5 @@
-const APP_SHELL_CACHE = "shopnshop-shell-v1";
+const APP_SHELL_CACHE = "shopnshop-shell-v2";
+const HTML_NAVIGATION_FALLBACKS = new Set(["/", "/index.html", "/login.html", "/workspace.html"]);
 const APP_SHELL_FILES = [
   "/",
   "/index.html",
@@ -36,6 +37,25 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin || url.pathname.startsWith("/api/")) {
+    return;
+  }
+
+  const isHtmlRequest = request.mode === "navigate" || HTML_NAVIGATION_FALLBACKS.has(url.pathname);
+
+  if (isHtmlRequest) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            caches.open(APP_SHELL_CACHE).then((cache) => cache.put(request, response.clone()));
+          }
+          return response;
+        })
+        .catch(async () => {
+          const cached = await caches.match(request);
+          return cached || caches.match("/workspace.html") || caches.match("/index.html");
+        }),
+    );
     return;
   }
 
