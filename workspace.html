@@ -74,7 +74,6 @@
             </section>
             <div class="workspace-body">
             <section class="tab-panel active" data-panel="overview">
-              <div id="workspaceAlert" class="critical-alert hidden"></div>
               <div class="summary-grid">
                 <div class="metric-card">
                   <p class="metric-label">등록 품목</p>
@@ -547,6 +546,10 @@
           <label>
             기준 재고
             <input name="parStock" type="number" min="0" step="0.1" required />
+          </label>
+          <label class="checkbox-field">
+            <input name="isPriority" type="checkbox" />
+            <span>강제 품목 우선 표시</span>
           </label>
           <div class="page-actions wide-field">
             <button id="resetItemFormButton" type="button" class="secondary-button">입력 초기화</button>

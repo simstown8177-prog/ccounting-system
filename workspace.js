@@ -49,7 +49,6 @@ const elements = {
   inventorySearchInput: document.querySelector("#inventorySearchInput"),
   inventoryStatusFilter: document.querySelector("#inventoryStatusFilter"),
   tabs: document.querySelector("#workspaceTabs"),
-  workspaceAlert: document.querySelector("#workspaceAlert"),
   metricItems: document.querySelector("#metricItems"),
   metricLowStock: document.querySelector("#metricLowStock"),
   metricOpenOrders: document.querySelector("#metricOpenOrders"),
@@ -263,7 +262,6 @@ function renderWorkspaceStats(category) {
   const lowStockItems = getLowStockItems(category);
   const todaysClosings = (category.receiptUploads || []).filter((entry) => toDateKey(entry.createdAt) === getTodayDateKey());
   const openOrders = category.purchaseOrders.filter((order) => order.status !== "received");
-  const lowStockCost = getLowStockFinancialTotals(category);
 
   elements.metricItems.textContent = String(category.items.length);
   elements.metricLowStock.textContent = String(lowStockItems.length);
@@ -271,46 +269,41 @@ function renderWorkspaceStats(category) {
   elements.metricTodayClosings.textContent = String(todaysClosings.length);
 
   if (!lowStockItems.length) {
-    elements.workspaceAlert.classList.add("hidden");
-    elements.workspaceAlert.textContent = "";
     state.lastAlarmSignatureByCategory[category.id] = "";
     persistClientState();
     return;
   }
 
-  const names = lowStockItems.map((item) => item.name).join(", ");
-  elements.workspaceAlert.classList.remove("hidden");
-  elements.workspaceAlert.textContent = `${names} 품목이 기준 재고 이하입니다. 예상 발주액 ${formatCurrency(lowStockCost.totalAmount)}원, 공급가액 ${formatCurrency(lowStockCost.supplyAmount)}원, 부가세 ${formatCurrency(lowStockCost.vatAmount)}원입니다.`;
   triggerAlertsIfNeeded(category, lowStockItems);
 }
 
 function renderInventoryTable(category) {
-  const items = getVisibleItems(category);
+  const items = getOverviewItems(category);
   elements.inventoryTableBody.innerHTML = items.length
     ? items
         .map((item) => {
           const shortage = roundNumber(Math.max(0, item.parStock - item.currentStock));
-          const status =
-            shortage === 0
-              ? '<span class="status-chip status-ok">정상</span>'
-              : shortage <= item.parStock * 0.3
-                ? '<span class="status-chip status-warning">발주 필요</span>'
-                : '<span class="status-chip status-danger">긴급</span>';
+          const isUrgent = item.currentStock <= 0 || shortage > item.parStock * 0.3;
+          const isPriorityUrgent = Boolean(item.isPriority && isUrgent);
+          const status = isUrgent
+            ? '<span class="status-chip status-danger">긴급</span>'
+            : '<span class="status-chip status-warning">발주 필요</span>';
+          const priorityBadge = isPriorityUrgent ? ' <span class="status-chip status-priority">강제</span>' : '';
 
           return `
-            <tr class="${shortage > 0 ? "low-stock" : ""}">
-              <td>${item.name}</td>
-              <td>${item.storageType || "-"}</td>
-              <td>${item.storageLocation || "-"}</td>
-              <td>${formatQuantity(item.currentStock)} ${item.unit}</td>
-              <td>${formatQuantity(item.parStock)} ${item.unit}</td>
-              <td>${formatQuantity(shortage)} ${item.unit}</td>
+            <tr class="low-stock${isPriorityUrgent ? " priority-row" : ""}">
+              <td>${escapeHtml(item.name)}${priorityBadge}</td>
+              <td>${escapeHtml(item.storageType || "-")}</td>
+              <td>${escapeHtml(item.storageLocation || "-")}</td>
+              <td>${formatQuantity(item.currentStock)} ${escapeHtml(item.unit)}</td>
+              <td>${formatQuantity(item.parStock)} ${escapeHtml(item.unit)}</td>
+              <td>${formatQuantity(shortage)} ${escapeHtml(item.unit)}</td>
               <td>${status}</td>
             </tr>
           `;
         })
         .join("")
-    : '<tr><td colspan="7">품목을 먼저 등록하세요.</td></tr>';
+    : '<tr><td colspan="7">기준 재고 이하 품목이 없습니다.</td></tr>';
 }
 
 function renderItemList(category) {
@@ -635,6 +628,7 @@ async function handleItemSubmit(event) {
     taxType: normalizeTaxType(String(formData.get("taxType") || "taxable")),
     currentStock: Number(formData.get("currentStock")),
     parStock: Number(formData.get("parStock")),
+    isPriority: formData.get("isPriority") === "on",
   });
   resetItemForm();
   closeItemModal();
@@ -1133,6 +1127,7 @@ function setItemFormValues(item = null) {
   elements.itemForm.elements.taxType.value = normalizeTaxType(item?.taxType || "taxable");
   elements.itemForm.elements.currentStock.value = item ? item.currentStock : "";
   elements.itemForm.elements.parStock.value = item ? item.parStock : "";
+  elements.itemForm.elements.isPriority.checked = Boolean(item?.isPriority);
   elements.itemSubmitButton.textContent = item ? "품목 수정" : "품목 저장";
   elements.itemModalTitle.textContent = item ? "재고 품목 수정" : "재고 품목 등록";
 }
@@ -1479,6 +1474,30 @@ function playAlarm() {
 
 function getLowStockItems(category) {
   return category.items.filter((item) => item.currentStock <= item.parStock);
+}
+
+function getOverviewItems(category) {
+  return [...(category.items || [])]
+    .filter((item) => number(item.currentStock) <= number(item.parStock))
+    .sort((left, right) => {
+      const leftShortage = Math.max(0, number(left.parStock) - number(left.currentStock));
+      const rightShortage = Math.max(0, number(right.parStock) - number(right.currentStock));
+      const leftUrgent = number(left.currentStock) <= 0 || leftShortage > number(left.parStock) * 0.3;
+      const rightUrgent = number(right.currentStock) <= 0 || rightShortage > number(right.parStock) * 0.3;
+      const leftPriority = Boolean(left.isPriority && leftUrgent);
+      const rightPriority = Boolean(right.isPriority && rightUrgent);
+
+      if (leftPriority !== rightPriority) {
+        return leftPriority ? -1 : 1;
+      }
+      if (leftUrgent !== rightUrgent) {
+        return leftUrgent ? -1 : 1;
+      }
+      if (leftShortage !== rightShortage) {
+        return rightShortage - leftShortage;
+      }
+      return left.name.localeCompare(right.name, "ko");
+    });
 }
 
 function getVisibleItems(category) {

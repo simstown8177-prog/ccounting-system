@@ -238,6 +238,7 @@ async function handleApi(req, res) {
         item.taxType = normalizeTaxType(body.taxType);
         item.currentStock = number(body.currentStock);
         item.parStock = number(body.parStock);
+        item.isPriority = Boolean(body.isPriority);
         return;
       }
 
@@ -254,6 +255,7 @@ async function handleApi(req, res) {
         taxType: normalizeTaxType(body.taxType),
         currentStock: number(body.currentStock),
         parStock: number(body.parStock),
+        isPriority: Boolean(body.isPriority),
       });
     });
   }
@@ -782,6 +784,7 @@ function createItem(
   productCode = "",
   category = "미분류",
   origin = "",
+  isPriority = false,
 ) {
   return {
     id: crypto.randomUUID(),
@@ -796,6 +799,7 @@ function createItem(
     storageLocation,
     purchasePrice: roundCurrency(purchasePrice),
     taxType: normalizeTaxType(taxType),
+    isPriority: Boolean(isPriority),
   };
 }
 
@@ -945,6 +949,7 @@ function sanitizeCategory(category) {
       storageLocation: item.storageLocation || "",
       purchasePrice: roundCurrency(item.purchasePrice),
       taxType: normalizeTaxType(item.taxType),
+      isPriority: Boolean(item.isPriority),
     })),
     purchaseOrders: (category.purchaseOrders || []).map((order) => enrichPurchaseOrder(order, category.items || [])),
     users: category.users.map(sanitizeUser),
@@ -1007,6 +1012,7 @@ function migrateStore(store) {
         storageLocation: item.storageLocation || "",
         purchasePrice: roundCurrency(item.purchasePrice),
         taxType: normalizeTaxType(item.taxType),
+        isPriority: Boolean(item.isPriority),
       })),
       purchaseOrders: (category.purchaseOrders || []).map((order) => enrichPurchaseOrder(order, category.items || [])),
       users: (category.users || []).map((user) => migrateUser(user)),
@@ -1235,6 +1241,7 @@ function importInventoryRows(category, rows) {
       existingItem.taxType = normalizeTaxType(row.taxType);
       existingItem.currentStock = row.currentStock;
       existingItem.parStock = row.parStock;
+      existingItem.isPriority = Boolean(existingItem.isPriority);
       summary.updated += 1;
       return;
     }
@@ -1252,6 +1259,7 @@ function importInventoryRows(category, rows) {
       taxType: normalizeTaxType(row.taxType),
       currentStock: row.currentStock,
       parStock: row.parStock,
+      isPriority: false,
     });
     summary.created += 1;
   });
