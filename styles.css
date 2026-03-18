@@ -670,6 +670,18 @@ textarea:focus {
   background: #fff;
 }
 
+.table-input-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.table-number-input {
+  width: 96px;
+  min-width: 96px;
+  padding: 10px 12px;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

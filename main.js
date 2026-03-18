@@ -25,6 +25,9 @@ function bindEvents() {
 }
 
 async function initialize() {
+  if (await tryEnterWorkspace()) {
+    return;
+  }
   await loadBootstrap();
   if (!state.selectedCategoryId && state.categories.length) {
     state.selectedCategoryId = state.categories[0].id;
@@ -124,6 +127,11 @@ function handleCategoryClick(event) {
 }
 
 function goToLogin() {
+  const stored = readClientState();
+  if (stored.authToken) {
+    window.location.href = "/workspace.html";
+    return;
+  }
   const categoryId = state.selectedCategoryId;
   const nextUrl = categoryId ? `/login.html?categoryId=${encodeURIComponent(categoryId)}` : "/login.html";
   window.location.href = nextUrl;
@@ -145,6 +153,59 @@ function readClientState() {
   } catch {
     return {};
   }
+}
+
+async function tryEnterWorkspace() {
+  const stored = readClientState();
+  if (stored.authToken) {
+    window.location.href = "/workspace.html";
+    return true;
+  }
+
+  const autoLogin = getAutoLogin(stored);
+  if (!autoLogin) {
+    return false;
+  }
+
+  try {
+    const response = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(autoLogin),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error || "login_failed");
+    }
+    persistClientState({
+      ...stored,
+      selectedCategoryId: autoLogin.categoryId,
+      authToken: payload.token,
+      activeTab: "overview",
+      autoLogin,
+    });
+    window.location.href = "/workspace.html";
+    return true;
+  } catch {
+    persistClientState({
+      ...stored,
+      selectedCategoryId: autoLogin.categoryId,
+      authToken: null,
+      activeTab: "overview",
+    });
+    return false;
+  }
+}
+
+function getAutoLogin(clientState) {
+  const autoLogin = clientState?.autoLogin;
+  if (!autoLogin) {
+    return null;
+  }
+  if (!autoLogin.categoryId || !autoLogin.username || !autoLogin.password) {
+    return null;
+  }
+  return autoLogin;
 }
 
 function persistClientState(nextState = null) {

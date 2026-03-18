@@ -1,4 +1,6 @@
 const CLIENT_STORAGE_KEY = "shop-n-shop-client-v1";
+const DEFAULT_WORKSPACE_TAB = "overview";
+const AVAILABLE_WORKSPACE_TABS = ["overview", "items", "vendors", "orders", "recipes", "receipt", "users", "kakao"];
 const XLSX_CDN_URL = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
 const TESSERACT_CDN_URL = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
 const INVENTORY_IMPORT_ALIASES = {
@@ -21,7 +23,7 @@ const clientState = readClientState();
 
 const state = {
   selectedCategoryId: clientState.selectedCategoryId || null,
-  activeTab: clientState.activeTab || "overview",
+  activeTab: normalizeWorkspaceTab(clientState.activeTab),
   authToken: clientState.authToken || null,
   notificationEnabled: Boolean(clientState.notificationEnabled),
   pushPublicKey: "",
@@ -114,6 +116,7 @@ function bindEvents() {
   elements.inventorySearchInput.addEventListener("input", handleInventorySearch);
   elements.inventoryStatusFilter.addEventListener("change", handleInventoryFilterChange);
   elements.tabs.addEventListener("click", handleTabClick);
+  elements.inventoryTableBody.addEventListener("click", handleOverviewTableAction);
   elements.itemList.addEventListener("click", handleItemListAction);
   elements.vendorList.addEventListener("click", handleVendorListAction);
   elements.menuRecipeList.addEventListener("click", handleMenuRecipeListAction);
@@ -145,8 +148,10 @@ function bindEvents() {
 
 async function initialize() {
   if (!state.authToken) {
-    redirectToLogin();
-    return;
+    if (!(await tryAutoLogin())) {
+      redirectToLogin();
+      return;
+    }
   }
 
   await registerServiceWorker();
@@ -155,8 +160,11 @@ async function initialize() {
     await loadWorkspace();
   } catch (error) {
     clearAuth();
-    redirectToLogin();
-    return;
+    if (!(await tryAutoLogin())) {
+      redirectToLogin();
+      return;
+    }
+    await loadWorkspace();
   }
 
   render();
@@ -249,6 +257,11 @@ function renderWorkspace() {
 }
 
 function syncTabState() {
+  if (!AVAILABLE_WORKSPACE_TABS.includes(state.activeTab)) {
+    state.activeTab = DEFAULT_WORKSPACE_TAB;
+    persistClientState();
+  }
+
   document.querySelectorAll(".tab-button").forEach((button) => {
     button.classList.toggle("active", button.dataset.tab === state.activeTab);
   });
@@ -295,15 +308,48 @@ function renderInventoryTable(category) {
               <td>${escapeHtml(item.name)}${priorityBadge}</td>
               <td>${escapeHtml(item.storageType || "-")}</td>
               <td>${escapeHtml(item.storageLocation || "-")}</td>
-              <td>${formatQuantity(item.currentStock)} ${escapeHtml(item.unit)}</td>
-              <td>${formatQuantity(item.parStock)} ${escapeHtml(item.unit)}</td>
+              <td>
+                <div class="table-input-wrap">
+                  <input
+                    class="table-number-input"
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    value="${escapeHtml(item.currentStock)}"
+                    data-field="currentStock"
+                    data-id="${item.id}"
+                    aria-label="${escapeHtml(item.name)} 현재 재고"
+                  />
+                  <span>${escapeHtml(item.unit)}</span>
+                </div>
+              </td>
+              <td>
+                <div class="table-input-wrap">
+                  <input
+                    class="table-number-input"
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    value="${escapeHtml(item.parStock)}"
+                    data-field="parStock"
+                    data-id="${item.id}"
+                    aria-label="${escapeHtml(item.name)} 기준 재고"
+                  />
+                  <span>${escapeHtml(item.unit)}</span>
+                </div>
+              </td>
               <td>${formatQuantity(shortage)} ${escapeHtml(item.unit)}</td>
               <td>${status}</td>
+              <td>
+                <button class="secondary-button compact-button" type="button" data-action="save-overview-item" data-id="${item.id}">
+                  저장
+                </button>
+              </td>
             </tr>
           `;
         })
         .join("")
-    : '<tr><td colspan="7">기준 재고 이하 품목이 없습니다.</td></tr>';
+    : '<tr><td colspan="8">기준 재고 이하 품목이 없습니다.</td></tr>';
 }
 
 function renderItemList(category) {
@@ -563,6 +609,7 @@ async function handleLogout() {
     // Ignore transport errors while logging out.
   }
 
+  clearAutoLogin();
   clearAuth();
   redirectToLogin();
 }
@@ -572,6 +619,29 @@ function clearAuth() {
   state.workspaceCategory = null;
   state.currentUser = null;
   persistClientState();
+}
+
+async function tryAutoLogin() {
+  const clientState = readClientState();
+  const autoLogin = getAutoLogin(clientState);
+  if (!autoLogin) {
+    return false;
+  }
+
+  try {
+    const payload = await apiFetch("/api/login", {
+      method: "POST",
+      headers: {},
+      body: JSON.stringify(autoLogin),
+    });
+    state.authToken = payload.token;
+    state.selectedCategoryId = autoLogin.categoryId;
+    persistClientState();
+    return true;
+  } catch {
+    clearAutoLogin();
+    return false;
+  }
 }
 
 function redirectToLogin() {
@@ -1110,6 +1180,40 @@ function handleItemListAction(event) {
   }
   if (button.dataset.action === "delete-item" && window.confirm("이 품목을 삭제할까요?")) {
     mutateWorkspace("/api/items/delete", { id: item.id });
+  }
+}
+
+async function handleOverviewTableAction(event) {
+  const button = event.target.closest('[data-action="save-overview-item"]');
+  if (!button) {
+    return;
+  }
+
+  const item = findById(state.workspaceCategory.items, button.dataset.id);
+  if (!item) {
+    return;
+  }
+
+  const row = button.closest("tr");
+  const currentStockInput = row?.querySelector('[data-field="currentStock"]');
+  const parStockInput = row?.querySelector('[data-field="parStock"]');
+  const currentStock = Number(currentStockInput?.value);
+  const parStock = Number(parStockInput?.value);
+
+  if (Number.isNaN(currentStock) || Number.isNaN(parStock) || currentStock < 0 || parStock < 0) {
+    window.alert("현재 재고와 기준 재고는 0 이상 숫자로 입력하세요.");
+    return;
+  }
+
+  button.disabled = true;
+  try {
+    await mutateWorkspace("/api/items", {
+      ...item,
+      currentStock,
+      parStock,
+    });
+  } finally {
+    button.disabled = false;
   }
 }
 
@@ -1742,12 +1846,32 @@ function readClientState() {
   }
 }
 
+function getAutoLogin(clientState) {
+  const autoLogin = clientState?.autoLogin;
+  if (!autoLogin) {
+    return null;
+  }
+  if (!autoLogin.categoryId || !autoLogin.username || !autoLogin.password) {
+    return null;
+  }
+  return autoLogin;
+}
+
+function clearAutoLogin() {
+  const nextState = readClientState();
+  delete nextState.autoLogin;
+  delete nextState.authToken;
+  localStorage.setItem(CLIENT_STORAGE_KEY, JSON.stringify(nextState));
+}
+
 function persistClientState() {
+  const stored = readClientState();
   localStorage.setItem(
     CLIENT_STORAGE_KEY,
     JSON.stringify({
+      ...stored,
       selectedCategoryId: state.selectedCategoryId,
-      activeTab: state.activeTab,
+      activeTab: normalizeWorkspaceTab(state.activeTab),
       authToken: state.authToken,
       inventoryCategoryFilter: state.inventoryCategoryFilter,
       notificationEnabled: state.notificationEnabled,
@@ -1755,4 +1879,8 @@ function persistClientState() {
       lastAlarmSignatureByCategory: state.lastAlarmSignatureByCategory,
     }),
   );
+}
+
+function normalizeWorkspaceTab(value) {
+  return AVAILABLE_WORKSPACE_TABS.includes(value) ? value : DEFAULT_WORKSPACE_TAB;
 }

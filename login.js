@@ -23,6 +23,9 @@ function bindEvents() {
 }
 
 async function initialize() {
+  if (await tryEnterWorkspace()) {
+    return;
+  }
   await loadBootstrap();
   if (!state.selectedCategoryId && state.categories.length) {
     state.selectedCategoryId = state.categories[0].id;
@@ -76,14 +79,16 @@ async function handleLogin(event) {
   event.preventDefault();
   hideError();
   const formData = new FormData(event.currentTarget);
+  const username = String(formData.get("username")).trim();
+  const password = String(formData.get("password")).trim();
 
   try {
     const payload = await apiFetch("/api/login", {
       method: "POST",
       body: JSON.stringify({
         categoryId: state.selectedCategoryId,
-        username: String(formData.get("username")).trim(),
-        password: String(formData.get("password")).trim(),
+        username,
+        password,
       }),
     });
 
@@ -92,6 +97,11 @@ async function handleLogin(event) {
       selectedCategoryId: state.selectedCategoryId,
       authToken: payload.token,
       activeTab: "overview",
+      autoLogin: {
+        categoryId: state.selectedCategoryId,
+        username,
+        password,
+      },
     });
     window.location.href = "/workspace.html";
   } catch (error) {
@@ -141,6 +151,56 @@ function readClientState() {
   } catch {
     return {};
   }
+}
+
+async function tryEnterWorkspace() {
+  const stored = readClientState();
+  if (stored.authToken) {
+    window.location.href = "/workspace.html";
+    return true;
+  }
+
+  const autoLogin = getAutoLogin(stored);
+  if (!autoLogin) {
+    return false;
+  }
+
+  state.selectedCategoryId = autoLogin.categoryId;
+
+  try {
+    const payload = await apiFetch("/api/login", {
+      method: "POST",
+      body: JSON.stringify(autoLogin),
+    });
+    persistClientState({
+      ...stored,
+      selectedCategoryId: autoLogin.categoryId,
+      authToken: payload.token,
+      activeTab: "overview",
+      autoLogin,
+    });
+    window.location.href = "/workspace.html";
+    return true;
+  } catch {
+    persistClientState({
+      ...stored,
+      selectedCategoryId: autoLogin.categoryId,
+      authToken: null,
+      activeTab: "overview",
+    });
+    return false;
+  }
+}
+
+function getAutoLogin(clientState) {
+  const autoLogin = clientState?.autoLogin;
+  if (!autoLogin) {
+    return null;
+  }
+  if (!autoLogin.categoryId || !autoLogin.username || !autoLogin.password) {
+    return null;
+  }
+  return autoLogin;
 }
 
 function persistClientState(nextState) {
